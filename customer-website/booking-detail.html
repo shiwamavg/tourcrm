@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking — Sikkim Trails Travel</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    <script>window.API_BASE = 'http://localhost:3000';</script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="wrap">
+        <a class="brand" href="dashboard.html">
+            <span class="logo">🏔️</span>
+            <span class="name">Sikkim Trails Travel<small>Customer Portal</small></span>
+        </a>
+        <nav class="topbar-nav">
+            <a href="dashboard.html">My bookings</a>
+            <a href="quote.html">Request a quote</a>
+            <a href="reviews.html">Reviews</a>
+        </nav>
+        <div data-topbar-user></div>
+    </div>
+</header>
+
+<main>
+    <div data-alert></div>
+
+    <div id="root">
+        <p class="muted"><span class="spinner"></span> Loading your booking…</p>
+    </div>
+</main>
+
+<!-- Payment modal -->
+<div id="payModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+        <h2>💳 Pay for your trip</h2>
+        <p>You're paying for booking <strong id="payBookingLabel"></strong>.</p>
+
+        <ul style="list-style:none;padding:0;margin:0 0 14px;display:flex;gap:6px">
+            <li><button class="btn btn-sm btn-primary" id="tabOnline" onclick="switchPayTab('online')">💳 Online</button></li>
+            <li><button class="btn btn-sm" id="tabOffline" onclick="switchPayTab('offline')">🏦 Offline (Bank transfer)</button></li>
+        </ul>
+
+        <!-- Online tab -->
+        <div id="payTabOnline">
+            <p>Pay <strong id="payAmountLabel">₹0</strong> using Cashfree's secure checkout
+            (cards, UPI, netbanking, wallets).</p>
+            <div class="alert alert-warn" id="payCfgWarning" style="display:none">
+                <span class="title">⚠ Demo mode:</span>
+                Cashfree credentials in this build are placeholders. In production
+                the gateway opens here. For the demo, please use the offline tab
+                below — your agency will record the payment and an invoice is auto-generated.
+            </div>
+            <div class="form-group">
+                <label for="payAmount">Amount (₹) <span class="req">*</span></label>
+                <input id="payAmount" type="number" min="1" step="1" required>
+            </div>
+            <div class="actions">
+                <button class="btn" onclick="closePayModal()">Cancel</button>
+                <button class="btn btn-accent" id="payNowBtn" onclick="payNow()">
+                    💳 Pay with Cashfree
+                </button>
+            </div>
+        </div>
+
+        <!-- Offline tab -->
+        <div id="payTabOffline" style="display:none">
+            <p>Use the agency bank details below, then record your transaction reference
+            so we can confirm and generate your invoice.</p>
+            <div class="alert alert-info" style="font-size:13px">
+                <div><strong>🏦 Bank details</strong></div>
+                <div>State Bank of Sikkim • A/C 37123456789 • IFSC SBIS0000123</div>
+                <div>Branch: Gangtok Main Branch</div>
+            </div>
+            <div class="form-group">
+                <label for="offAmount">Amount transferred (₹) <span class="req">*</span></label>
+                <input id="offAmount" type="number" min="1" step="1" required>
+            </div>
+            <div class="form-group">
+                <label for="offRef">Reference / UTR number <span class="req">*</span></label>
+                <input id="offRef" type="text" required placeholder="e.g. HDFC12345678 or UPI txn id">
+            </div>
+            <div class="form-group">
+                <label for="offNote">Note (optional)</label>
+                <input id="offNote" type="text" placeholder="e.g. Paid via Google Pay">
+            </div>
+            <div class="actions">
+                <button class="btn" onclick="closePayModal()">Cancel</button>
+                <button class="btn btn-accent" id="payOfflineBtn" onclick="payOffline()">
+                    ✓ Notify Agency
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Review modal -->
+<div id="reviewModal" class="modal-backdrop" style="display:none">
+    <div class="modal">
+        <h2>⭐ Leave a review</h2>
+        <p>Tell us how your trip went! Your review will appear on our public page (after a quick spot-check).</p>
+        <div class="form-group">
+            <label>Your rating <span class="req">*</span></label>
+            <div class="stars-input">
+                <input type="radio" id="star5" name="rating" value="5"><label for="star5">★</label>
+                <input type="radio" id="star4" name="rating" value="4"><label for="star4">★</label>
+                <input type="radio" id="star3" name="rating" value="3"><label for="star3">★</label>
+                <input type="radio" id="star2" name="rating" value="2"><label for="star2">★</label>
+                <input type="radio" id="star1" name="rating" value="1"><label for="star1">★</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="reviewTitle">Title (optional)</label>
+            <input id="reviewTitle" type="text" maxlength="120" placeholder="e.g. Magical honeymoon">
+        </div>
+        <div class="form-group">
+            <label for="reviewComment">Your review <span class="req">*</span></label>
+            <textarea id="reviewComment" rows="4" required minlength="5" maxlength="2000"
+                      placeholder="What did you love? What could we improve?"></textarea>
+        </div>
+        <div class="actions">
+            <button class="btn" onclick="closeReviewModal()">Cancel</button>
+            <button class="btn btn-accent" id="submitReviewBtn" onclick="submitReview()">
+                ✓ Submit Review
+            </button>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>Sikkim Trails Travel</h4>
+                <p>M.G. Marg, Gangtok, Sikkim 737101, India</p>
+                <p>📞 +91 98765 43210 • ✉ bookings@sikkimtrails.demo</p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> Sikkim Trails Travel.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    if (!Auth.require()) {}
+
+    Auth.renderTopbar();
+
+    const bookingId = parseInt(getQueryParam('id') || '0', 10);
+    if (!bookingId) {
+        document.getElementById('root').innerHTML = `
+            <div class="card">
+                <h2>Booking not specified</h2>
+                <p><a href="dashboard.html">← Back to my bookings</a></p>
+            </div>`;
+    }
+
+    let CURRENT_BOOKING = null;
+    let CASHFREE_MODE    = 'sandbox';   // updated after we get the order
+
+    async function loadBooking() {
+        try {
+            const b = await API.bookingDetail(bookingId, Auth.token);
+            CURRENT_BOOKING = b;
+            render(b);
+        } catch (err) {
+            if (err.status === 401) { Auth.clear(); location.href = 'index.html'; return; }
+            if (err.status === 404) {
+                document.getElementById('root').innerHTML = `
+                    <div class="card">
+                        <h2>Booking not found</h2>
+                        <p>It may belong to a different email. <a href="dashboard.html">Back to my bookings</a>.</p>
+                    </div>`;
+                return;
+            }
+            document.getElementById('root').innerHTML = `
+                <div class="card">
+                    <h2>Could not load booking</h2>
+                    <p class="muted">${escapeHtml(err.message)}</p>
+                </div>`;
+        }
+    }
+
+    function render(b) {
+        const balance = Math.max(0, Number(b.total_amount || 0) - Number(b.amount_paid || 0));
+        const canPay  = b.status !== 'cancelled' && balance > 0;
+        const canReview = b.status !== 'cancelled' && !b.review;
+
+        const root = document.getElementById('root');
+        root.innerHTML = `
+            <div class="page-title">
+                <h1>📦 ${escapeHtml(b.booking_number)}</h1>
+                <span class="sub">${escapeHtml(b.destination_name || b.destination_text || '')}</span>
+            </div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="label">Trip</div>
+                    <div class="value">${formatDate(b.trip_start_date)}<br><small>to ${formatDate(b.trip_end_date)}</small></div>
+                </div>
+                <div class="stat">
+                    <div class="label">Pax</div>
+                    <div class="value">${b.adults || 0} adults</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Status</div>
+                    <div class="value">
+                        <span class="badge badge-${b.status}">${b.status}</span>
+                    </div>
+                </div>
+                <div class="stat success">
+                    <div class="label">Total</div>
+                    <div class="value">${formatINRShort(b.total_amount)}</div>
+                </div>
+                <div class="stat">
+                    <div class="label">Paid</div>
+                    <div class="value">${formatINRShort(b.amount_paid)}</div>
+                </div>
+                <div class="stat ${balance > 0 ? 'danger' : 'success'}">
+                    <div class="label">Balance</div>
+                    <div class="value">${formatINRShort(balance)}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>💳 Payment</h2>
+                <p>You can pay online via Cashfree (cards, UPI, netbanking) or record a
+                bank transfer / cash payment that our team will confirm.</p>
+                <div class="flex" style="gap:8px">
+                    ${canPay ? `
+                        <button class="btn btn-accent" onclick="openPayModal()">💳 Pay Online</button>
+                        <a class="btn" href="mailto:bookings@sikkimtrails.demo?subject=Offline payment for ${encodeURIComponent(b.booking_number)}">
+                            🏦 Record offline payment
+                        </a>
+                    ` : '<p class="muted">This booking is fully paid — thank you!</p>'}
+                    ${canReview ? `<button class="btn" onclick="openReviewModal()">⭐ Leave a review</button>` : ''}
+                </div>
+            </div>
+
+            ${b.hotels?.length ? `
+            <div class="card">
+                <h2>🏨 Hotels</h2>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Hotel</th><th>Room</th><th>Meal</th><th class="num">N × R</th><th class="num">Rate</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                        ${b.hotels.map(h => `
+                            <tr>
+                                <td><strong>${escapeHtml(h.hotel_name)}</strong>${h.star_rating ? ` <small>${h.star_rating}★</small>` : ''}</td>
+                                <td>${escapeHtml(h.room_type || '')}</td>
+                                <td>${escapeHtml(h.meal_plan || '')}</td>
+                                <td class="num">${h.num_nights} × ${h.num_rooms}</td>
+                                <td class="num">${formatINRShort(h.charge_per_night)}</td>
+                                <td class="num"><strong>${formatINRShort(h.line_total)}</strong></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>` : ''}
+
+            ${b.cars?.length ? `
+            <div class="card">
+                <h2>🚗 Transport</h2>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Car</th><th>Class</th><th class="num">Days</th><th class="num">Rate</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                        ${b.cars.map(c => `
+                            <tr>
+                                <td><strong>${escapeHtml(c.car_type_name)}</strong></td>
+                                <td>${escapeHtml(c.car_class || '')}</td>
+                                <td class="num">${c.num_days}</td>
+                                <td class="num">${formatINRShort(c.charge_per_day)}</td>
+                                <td class="num"><strong>${formatINRShort(c.line_total)}</strong></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>` : ''}
+
+            ${b.payments?.length ? `
+            <div class="card">
+                <h2>💰 Payment history</h2>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Date</th><th>Gateway</th><th>Method</th><th>Reference</th><th class="num">Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                        ${b.payments.map(p => `
+                            <tr>
+                                <td>${formatDate(p.paid_at || p.created_at)}</td>
+                                <td>${escapeHtml(p.gateway)}</td>
+                                <td>${escapeHtml(p.method_label || '—')}</td>
+                                <td>${escapeHtml(p.offline_reference || p.gateway_payment_id || '—')}</td>
+                                <td class="num"><strong>${formatINRShort(p.amount)}</strong></td>
+                                <td><span class="badge badge-${p.status}">${p.status}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>` : ''}
+
+            ${b.invoices?.length ? `
+            <div class="card">
+                <h2>🧾 Invoices</h2>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Invoice #</th><th>Issued</th><th class="num">Total</th><th></th></tr></thead>
+                    <tbody>
+                        ${b.invoices.map(i => `
+                            <tr>
+                                <td><strong>${escapeHtml(i.invoice_number)}</strong></td>
+                                <td>${formatDate(i.issued_at)}</td>
+                                <td class="num">${formatINRShort(i.total)}</td>
+                                <td><button class="btn btn-sm btn-primary" onclick="downloadInvoice(${i.id})">📄 Download PDF</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>` : ''}
+
+            ${b.review ? `
+            <div class="card">
+                <h2>⭐ Your review</h2>
+                <div class="review-card">
+                    <div class="stars">${'★'.repeat(b.review.rating)}${'☆'.repeat(5 - b.review.rating)}</div>
+                    ${b.review.title ? `<strong>${escapeHtml(b.review.title)}</strong><br>` : ''}
+                    <p>${escapeHtml(b.review.comment)}</p>
+                    <div class="by">Submitted ${formatDate(b.review.created_at)}</div>
+                </div>
+            </div>` : ''}
+
+            <p><a href="dashboard.html">← Back to my bookings</a></p>
+        `;
+    }
+
+    // ── Pay modal ─────────────────────────────────────────
+    function openPayModal() {
+        if (!CURRENT_BOOKING) return;
+        const balance = Math.max(0, Number(CURRENT_BOOKING.total_amount) - Number(CURRENT_BOOKING.amount_paid));
+        document.getElementById('payAmount').value = balance;
+        document.getElementById('payAmountLabel').textContent = formatINRShort(balance);
+        document.getElementById('payBookingLabel').textContent = CURRENT_BOOKING.booking_number;
+        document.getElementById('payModal').style.display = 'flex';
+    }
+    function closePayModal() { document.getElementById('payModal').style.display = 'none'; }
+    async function payNow() {
+        const amount = parseFloat(document.getElementById('payAmount').value || '0');
+        if (!amount || amount <= 0) { showAlert('error', 'Please enter a valid amount.'); return; }
+        const btn = document.getElementById('payNowBtn');
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Connecting…';
+        try {
+            const r = await API.payBooking(CURRENT_BOOKING.id, amount, Auth.token);
+            CASHFREE_MODE = r.env === 'PROD' ? 'production' : 'sandbox';
+            // Real Cashfree redirect
+            if (r.payment_session_id && window.Cashfree) {
+                try {
+                    const cashfree = window.Cashfree({ mode: CASHFREE_MODE });
+                    cashfree.checkout({
+                        paymentSessionId: r.payment_session_id,
+                        redirectTarget: '_self'
+                    });
+                    return; // the page will redirect
+                } catch (e) {
+                    console.warn('Cashfree SDK error, falling back to no-redirect demo', e);
+                }
+            }
+            // Fallback (Cashfree not configured / SDK failed): just show success
+            showAlert('success',
+                `Order ${r.order_id} created in demo mode. In production the gateway would now open. ` +
+                `Our team will mark it as paid when the webhook arrives.`);
+            closePayModal();
+            loadBooking();
+        } catch (err) {
+            showAlert('error', err.message || 'Failed to create payment');
+            if (err.payload?.code === 'CASHFREE_NOT_CONFIGURED' ||
+                (err.message || '').includes('demo mode')) {
+                showDemoWarning();
+            }
+        } finally {
+            btn.disabled = false; btn.innerHTML = '💳 Pay with Cashfree';
+        }
+    }
+    // Show demo-mode warning if needed after we attempt to open
+    function showDemoWarning() {
+        document.getElementById('payCfgWarning').style.display = 'block';
+    }
+
+    // ── Pay modal tab switcher ───────────────────────────
+    function switchPayTab(tab) {
+        const isOnline = tab === 'online';
+        document.getElementById('payTabOnline').style.display  = isOnline ? 'block' : 'none';
+        document.getElementById('payTabOffline').style.display = isOnline ? 'none'  : 'block';
+        const tO = document.getElementById('tabOnline');
+        const tF = document.getElementById('tabOffline');
+        tO.className = isOnline ? 'btn btn-sm btn-primary' : 'btn btn-sm';
+        tF.className = isOnline ? 'btn btn-sm' : 'btn btn-sm btn-primary';
+    }
+
+    // ── Offline (bank transfer) payment notification ─────
+    async function payOffline() {
+        const amount = parseFloat(document.getElementById('offAmount').value || '0');
+        const ref    = document.getElementById('offRef').value.trim();
+        const note   = document.getElementById('offNote').value.trim();
+        if (!amount || amount <= 0) { showAlert('error', 'Please enter a valid amount.'); return; }
+        if (!ref) { showAlert('error', 'Please enter the reference / UTR number.'); return; }
+        const btn = document.getElementById('payOfflineBtn');
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Notifying…';
+        try {
+            await API.recordOfflinePayment(CURRENT_BOOKING.id, {
+                amount,
+                reference: ref,
+                method: 'bank_transfer',
+                note: note || 'Recorded via customer portal'
+            }, Auth.token);
+            showAlert('success',
+                `Thank you! We've recorded your payment of ${formatINR(amount)}. ` +
+                `Our team will verify the bank transfer with reference ${ref} and ` +
+                `an invoice will be auto-generated.`);
+            closePayModal();
+            loadBooking();
+        } catch (err) {
+            showAlert('error', err.message || 'Failed to record payment');
+        } finally {
+            btn.disabled = false; btn.innerHTML = '✓ Notify Agency';
+        }
+    }
+
+    // ── Review modal ──────────────────────────────────────
+    function openReviewModal() {
+        if (!CURRENT_BOOKING) return;
+        document.getElementById('reviewModal').style.display = 'flex';
+    }
+    function closeReviewModal() {
+        document.getElementById('reviewModal').style.display = 'none';
+    }
+    async function submitReview() {
+        const checked = document.querySelector('input[name="rating"]:checked');
+        if (!checked) { showAlert('error', 'Please pick a star rating.'); return; }
+        const rating = Number(checked.value);
+        const comment = document.getElementById('reviewComment').value.trim();
+        const title   = document.getElementById('reviewTitle').value.trim();
+        if (comment.length < 5) { showAlert('error', 'Review must be at least 5 characters.'); return; }
+        const btn = document.getElementById('submitReviewBtn');
+        btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting…';
+        try {
+            await API.reviewBooking(CURRENT_BOOKING.id, { rating, title, comment }, Auth.token);
+            showAlert('success', 'Thank you! Your review has been submitted.');
+            closeReviewModal();
+            loadBooking();
+        } catch (err) {
+            if (err.payload?.error?.includes('exists')) {
+                showAlert('error', 'You have already reviewed this booking.');
+            } else {
+                showAlert('error', err.message || 'Failed to submit review');
+            }
+        } finally {
+            btn.disabled = false; btn.innerHTML = '✓ Submit Review';
+        }
+    }
+
+    // ── Invoice download ──────────────────────────────────
+    async function downloadInvoice(id) {
+        try {
+            const url = await API.downloadInvoicePdf(id, Auth.token);
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch (err) {
+            showAlert('error', 'Failed to download invoice: ' + err.message);
+        }
+    }
+
+    // Cashfree SDK may not be reachable from the sandbox; show a soft warning up-front
+    if (!window.Cashfree) {
+        document.addEventListener('DOMContentLoaded', () => {
+            // The modal will show the warning when the user opens it
+        });
+    }
+
+    loadBooking();
+</script>
+
+</body>
+</html>

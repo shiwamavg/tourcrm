@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Reviews — Sikkim Trails Travel</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <script>window.API_BASE = 'http://localhost:3000';</script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="wrap">
+        <a class="brand" href="index.html">
+            <span class="logo">🏔️</span>
+            <span class="name">Sikkim Trails Travel<small>Customer Portal</small></span>
+        </a>
+        <nav class="topbar-nav">
+            <a href="index.html">Sign in</a>
+            <a href="dashboard.html">My bookings</a>
+            <a href="quote.html">Request a quote</a>
+        </nav>
+        <div data-topbar-user></div>
+    </div>
+</header>
+
+<main>
+    <div class="page-title">
+        <h1>⭐ What our travellers say</h1>
+        <span class="sub" id="avgLine"></span>
+    </div>
+
+    <div class="card">
+        <div id="reviewsArea">
+            <p class="muted"><span class="spinner"></span> Loading reviews…</p>
+        </div>
+    </div>
+
+    <div class="card" style="text-align:center">
+        <h2>Have you travelled with us?</h2>
+        <p>Sign in to your portal and leave a review of your trip.</p>
+        <a class="btn btn-primary" href="index.html">Sign in →</a>
+    </div>
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>Sikkim Trails Travel</h4>
+                <p>M.G. Marg, Gangtok, Sikkim 737101, India</p>
+                <p>📞 +91 98765 43210 • ✉ bookings@sikkimtrails.demo</p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> Sikkim Trails Travel.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    Auth.renderTopbar();
+    (async () => {
+        try {
+            const r = await API.publicReviews();
+            const items = r.items || [];
+            document.getElementById('avgLine').textContent =
+                `— ${r.total} reviews, average ★ ${r.avg_rating}/5`;
+            const area = document.getElementById('reviewsArea');
+            if (!items.length) {
+                area.innerHTML = `<div class="empty"><div class="icon">⭐</div>
+                    <p>No reviews yet — be the first!</p></div>`;
+                return;
+            }
+            area.innerHTML = items.map(rv => `
+                <div class="review-card">
+                    <div class="stars">${'★'.repeat(rv.rating)}${'☆'.repeat(5 - rv.rating)}</div>
+                    ${rv.title ? `<strong>${escapeHtml(rv.title)}</strong><br>` : ''}
+                    <p>${escapeHtml(rv.comment)}</p>
+                    ${rv.admin_reply ? `
+                        <div style="background:#f9fafb;border-left:3px solid #0f766e;padding:8px 12px;border-radius:4px;margin-top:8px">
+                            <strong>↩ Agency reply:</strong>
+                            <p style="margin:4px 0 0">${escapeHtml(rv.admin_reply)}</p>
+                        </div>` : ''}
+                    <div class="by">— ${escapeHtml(rv.customer_name)}
+                        ${rv.destination_name ? ' • ' + escapeHtml(rv.destination_name) : ''}
+                        • ${formatDate(rv.created_at)}</div>
+                </div>
+            `).join('');
+        } catch (err) {
+            document.getElementById('reviewsArea').innerHTML =
+                `<p class="muted">Reviews could not be loaded: ${escapeHtml(err.message)}</p>`;
+        }
+    })();
+</script>
+
+</body>
+</html>

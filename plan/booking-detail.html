@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Booking Detail</title>
+<link rel="stylesheet" href="css/portal.css">
+<!-- Cashfree JS SDK -->
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+</head>
+<body>
+
+<header class="portal-header">
+    <div class="logo">✈ My Bookings</div>
+    <div class="user-info">
+        <span id="customer-name"></span>
+        <button class="btn-outline" id="btn-logout">Logout</button>
+    </div>
+</header>
+
+<main class="portal-main">
+    <a href="dashboard.html" class="back-btn">← Back to My Bookings</a>
+
+    <div id="page-content">
+        <div class="empty-state"><div class="loader"></div></div>
+    </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+if (!sessionStorage.getItem('portal_token')) window.location.href = 'index.html';
+
+const customer = JSON.parse(sessionStorage.getItem('portal_customer') || '{}');
+document.getElementById('customer-name').textContent = customer.name || '';
+document.getElementById('btn-logout').addEventListener('click', () => {
+    sessionStorage.clear(); window.location.href = 'index.html';
+});
+
+const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+const fmtCurrency = (n) => '₹' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 });
+
+const bookingId = new URLSearchParams(window.location.search).get('id');
+if (!bookingId) window.location.href = 'dashboard.html';
+
+apiGet(`/portal/bookings/${bookingId}`).then(({ booking, quotation, itinerary, payments, invoice }) => {
+    const balance = parseFloat(booking.balance_due);
+
+    document.getElementById('page-content').innerHTML = `
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+            <div>
+                <h1 style="font-size:22px;font-weight:700;">${booking.destination_text}</h1>
+                <p style="color:var(--text-muted);font-size:14px;margin-top:4px;">${booking.booking_number}</p>
+            </div>
+            <span class="badge badge-${booking.status.replace('_','-')}">${booking.status.replace('_',' ')}</span>
+        </div>
+
+        <!-- Payment Summary -->
+        <div class="payment-summary">
+            <div class="pay-stat">
+                <div class="stat-label">Total Amount</div>
+                <div class="stat-value">${fmtCurrency(booking.total_amount)}</div>
+            </div>
+            <div class="pay-stat">
+                <div class="stat-label">Amount Paid</div>
+                <div class="stat-value success">${fmtCurrency(booking.total_paid)}</div>
+            </div>
+            <div class="pay-stat">
+                <div class="stat-label">Balance Due</div>
+                <div class="stat-value ${balance > 0 ? 'danger' : 'success'}">${balance > 0 ? fmtCurrency(balance) : 'Paid ✓'}</div>
+            </div>
+        </div>
+
+        ${balance > 0 ? `
+        <div class="detail-section" style="border-color:#fca5a5;background:#fff5f5;">
+            <h2 style="border-bottom-color:#fca5a5;">Pay Now</h2>
+            <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">Pay your balance of <strong>${fmtCurrency(balance)}</strong> securely online.</p>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <input type="number" id="pay-amount" value="${balance.toFixed(0)}" min="1" max="${balance.toFixed(0)}" style="width:180px;" placeholder="Amount to pay">
+                <button class="btn-primary" id="btn-pay-now" style="width:auto;padding:10px 24px;">Pay with Cashfree</button>
+            </div>
+            <p id="pay-error" class="error-msg"></p>
+        </div>
+        ` : ''}
+
+        <!-- Trip Details -->
+        <div class="detail-section">
+            <h2>Trip Details</h2>
+            <div class="info-grid">
+                <div class="info-item"><label>Destination</label><span>${booking.destination_text}</span></div>
+                <div class="info-item"><label>Travel Dates</label><span>${fmt(booking.trip_start_date)} → ${fmt(booking.trip_end_date)}</span></div>
+                <div class="info-item"><label>Adults</label><span>${booking.adults}</span></div>
+                <div class="info-item"><label>Children (u5)</label><span>${booking.children_below_5 || 0}</span></div>
+                ${booking.special_requests ? `<div class="info-item" style="grid-column:span 2"><label>Special Requests</label><span>${booking.special_requests}</span></div>` : ''}
+            </div>
+        </div>
+
+        <!-- Hotel Itinerary -->
+        ${itinerary.hotels.length ? `
+        <div class="detail-section">
+            <h2>🏨 Hotels</h2>
+            ${itinerary.hotels.map(h => `
+                <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div style="font-weight:600;">${h.hotel_name}</div>
+                            <div style="font-size:13px;color:var(--text-muted);">${h.room_type} · ${h.meal_plan.replace('_', '+')} · ${h.num_nights} nights × ${h.num_rooms} room(s)</div>
+                        </div>
+                        <div style="font-weight:600;">${fmtCurrency(h.line_total)}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Car Itinerary -->
+        ${itinerary.cars.length ? `
+        <div class="detail-section">
+            <h2>🚗 Transport</h2>
+            ${itinerary.cars.map(c => `
+                <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div style="font-weight:600;">${c.car_type_name} (${c.car_class})</div>
+                            <div style="font-size:13px;color:var(--text-muted);">${c.num_days} days · ${c.km_limit_per_day} km/day included</div>
+                        </div>
+                        <div style="font-weight:600;">${fmtCurrency(c.line_total)}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        <!-- Misc charges -->
+        ${itinerary.misc.length ? `
+        <div class="detail-section">
+            <h2>📋 Other Charges</h2>
+            <table class="line-items-table">
+                ${itinerary.misc.map(m => `
+                    <tr><td>${m.label}</td><td class="amount-col">${fmtCurrency(m.amount)}</td></tr>
+                `).join('')}
+            </table>
+        </div>
+        ` : ''}
+
+        <!-- Grand Total -->
+        ${quotation ? `
+        <div class="detail-section">
+            <h2>💰 Price Breakdown</h2>
+            <table class="line-items-table">
+                <tr><td>Hotels</td><td class="amount-col">${fmtCurrency(quotation.hotel_total)}</td></tr>
+                <tr><td>Transport</td><td class="amount-col">${fmtCurrency(quotation.car_total)}</td></tr>
+                ${parseFloat(quotation.flight_total) > 0 ? `<tr><td>Flights</td><td class="amount-col">${fmtCurrency(quotation.flight_total)}</td></tr>` : ''}
+                <tr><td>Other charges</td><td class="amount-col">${fmtCurrency(quotation.misc_total)}</td></tr>
+                <tr><td>Subtotal</td><td class="amount-col">${fmtCurrency(quotation.subtotal)}</td></tr>
+                ${parseFloat(quotation.markup_amount) > 0 ? `<tr><td>Service charges (${quotation.markup_pct}%)</td><td class="amount-col">${fmtCurrency(quotation.markup_amount)}</td></tr>` : ''}
+                ${parseFloat(quotation.gst_amount) > 0 ? `<tr><td>GST (${quotation.gst_pct}%)</td><td class="amount-col">${fmtCurrency(quotation.gst_amount)}</td></tr>` : ''}
+                <tr class="total-row"><td>Grand Total</td><td class="amount-col">${fmtCurrency(quotation.grand_total)}</td></tr>
+            </table>
+        </div>
+        ` : ''}
+
+        <!-- Payment History -->
+        ${payments.length ? `
+        <div class="detail-section">
+            <h2>Payment History</h2>
+            <table class="line-items-table">
+                <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th class="text-right">Amount</th></tr></thead>
+                <tbody>
+                    ${payments.map(p => `
+                        <tr>
+                            <td>${fmt(p.payment_date)}</td>
+                            <td>${p.payment_method.replace(/_/g,' ')}</td>
+                            <td style="color:var(--text-muted);font-size:13px;">${p.reference_number || '—'}</td>
+                            <td class="amount-col">${fmtCurrency(p.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ` : ''}
+
+        ${invoice ? `
+        <div style="text-align:center;padding:12px 0 4px;">
+            <a href="#" id="download-invoice" class="btn-outline" style="display:inline-block;">⬇ Download Invoice (${invoice.invoice_number})</a>
+        </div>
+        ` : ''}
+    `;
+
+    // Pay now handler
+    document.getElementById('btn-pay-now')?.addEventListener('click', initiatePayment);
+
+}).catch((err) => {
+    document.getElementById('page-content').innerHTML =
+        `<p class="error-msg" style="text-align:center;padding:24px;">Failed to load booking. ${err.message}</p>`;
+});
+
+async function initiatePayment() {
+    const amountInput = document.getElementById('pay-amount');
+    const amount = parseFloat(amountInput?.value);
+    const payError = document.getElementById('pay-error');
+    payError.textContent = '';
+
+    if (!amount || amount <= 0) { payError.textContent = 'Enter a valid amount'; return; }
+
+    const btn = document.getElementById('btn-pay-now');
+    btn.disabled = true;
+    btn.textContent = 'Creating order…';
+
+    try {
+        const order = await apiPost('/portal/payments/create-order', {
+            booking_id: bookingId,
+            amount
+        });
+
+        const cashfree = await Cashfree({ mode: 'sandbox' }); // Change to 'production' for live
+        const result = await cashfree.checkout({
+            paymentSessionId: order.payment_session_id,
+            redirectTarget: '_modal'
+        });
+
+        if (result.paymentDetails) {
+            // Payment likely successful, reload
+            window.location.reload();
+        }
+    } catch (err) {
+        document.getElementById('pay-error').textContent = err.message || 'Payment failed. Please try again.';
+        btn.disabled = false;
+        btn.textContent = 'Pay with Cashfree';
+    }
+}
+</script>
+</body>
+</html>

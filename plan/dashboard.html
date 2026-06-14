@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Bookings</title>
+<link rel="stylesheet" href="css/portal.css">
+</head>
+<body>
+
+<header class="portal-header">
+    <div class="logo">✈ My Bookings</div>
+    <div class="user-info">
+        <span id="customer-name"></span>
+        <button class="btn-outline" id="btn-logout">Logout</button>
+    </div>
+</header>
+
+<main class="portal-main">
+    <h2 class="mb-4" style="font-size:20px;font-weight:600;">Your Trips</h2>
+    <div id="bookings-list">
+        <div class="empty-state"><div class="loader"></div></div>
+    </div>
+</main>
+
+<script src="js/api.js"></script>
+<script>
+const customer = JSON.parse(sessionStorage.getItem('portal_customer') || '{}');
+if (!sessionStorage.getItem('portal_token')) window.location.href = 'index.html';
+
+document.getElementById('customer-name').textContent = customer.name || '';
+document.getElementById('btn-logout').addEventListener('click', () => {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+});
+
+const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+const fmtCurrency = (n) => '₹' + parseFloat(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0 });
+
+const statusBadge = (s) => {
+    const map = {
+        confirmed: 'badge-confirmed', in_progress: 'badge-in-progress',
+        completed: 'badge-completed', cancelled: 'badge-cancelled'
+    };
+    return `<span class="badge ${map[s] || 'badge-confirmed'}">${s.replace('_',' ')}</span>`;
+};
+
+const payBadge = (s) => {
+    const map = { pending: 'badge-pending', partial: 'badge-partial', paid: 'badge-paid' };
+    return `<span class="badge ${map[s] || 'badge-pending'}">${s}</span>`;
+};
+
+apiGet('/portal/bookings').then(bookings => {
+    const list = document.getElementById('bookings-list');
+    if (!bookings.length) {
+        list.innerHTML = `<div class="empty-state"><div class="icon">🌍</div><p>No bookings yet.</p></div>`;
+        return;
+    }
+    list.innerHTML = bookings.map(b => `
+        <a class="booking-card" href="booking-detail.html?id=${b.id}">
+            <div class="booking-card-header">
+                <div>
+                    <div class="booking-destination">${b.destination_text}</div>
+                    <div class="booking-number">${b.booking_number}</div>
+                </div>
+                <div style="text-align:right">${statusBadge(b.status)}</div>
+            </div>
+            <div class="booking-dates">📅 ${fmt(b.trip_start_date)} → ${fmt(b.trip_end_date)} &nbsp;|&nbsp; 👤 ${b.adults} adults</div>
+            <div class="booking-footer">
+                <div class="booking-amount">${fmtCurrency(b.total_amount)} ${payBadge(b.payment_status)}</div>
+                ${parseFloat(b.balance_due) > 0 ? `<div class="balance-due">Balance: ${fmtCurrency(b.balance_due)}</div>` : '<div style="color:var(--success);font-size:13px;font-weight:500;">✓ Fully paid</div>'}
+            </div>
+        </a>
+    `).join('');
+}).catch(() => {
+    document.getElementById('bookings-list').innerHTML = `<p class="error-msg" style="text-align:center;padding:24px;">Failed to load bookings. Please try again.</p>`;
+});
+</script>
+</body>
+</html>

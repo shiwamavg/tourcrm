@@ -1,0 +1,63 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1444 >>
+stream
+BT /F2 20 Tf 50 770 Td (ABC Tours) Tj ET
+BT /F1 9 Tf 50 752 Td (123 Street) Tj ET
+BT /F1 9 Tf 50 740 Td (GSTIN: GST123) Tj ET
+BT /F1 9 Tf 50 728 Td (Phone: +911234567890) Tj ET
+BT /F2 18 Tf 446 770 Td (TAX INVOICE) Tj ET
+BT /F1 9 Tf 437 752 Td (Invoice #: INV-2026-0001) Tj ET
+BT /F1 9 Tf 468.5 740 Td (Issued: 14/6/2026) Tj ET
+BT /F2 9 Tf 50 698 Td (BILL TO) Tj ET
+BT /F2 11 Tf 50 684 Td (Test Customer) Tj ET
+BT /F1 9 Tf 50 672 Td (test@example.com) Tj ET
+BT /F1 9 Tf 50 660 Td (+919876543210) Tj ET
+BT /F2 9 Tf 513.5 710 Td (BOOKING) Tj ET
+BT /F1 10 Tf 520 696 Td (#B001) Tj ET
+BT /F1 9 Tf 414.5 684 Td (Trip: 2026-07-01 ’ 2026-07-10) Tj ET
+BT /F2 9 Tf 50 630 Td (DESCRIPTION) Tj ET
+BT /F2 9 Tf 518 630 Td (AMOUNT) Tj ET
+BT /F1 9 Tf 50 626 Td (________________________________________________________________________________) Tj ET
+BT /F1 10 Tf 50 610 Td (Tour Package: DELUXE) Tj ET
+BT /F1 10 Tf 495 610 Td (INR 50,000) Tj ET
+BT /F1 10 Tf 50 596 Td (Tax \(GST\)) Tj ET
+BT /F1 10 Tf 500 596 Td (INR 9,000) Tj ET
+BT /F1 9 Tf 50 582 Td (________________________________________________________________________________) Tj ET
+BT /F2 12 Tf 50 564 Td (TOTAL) Tj ET
+BT /F2 12 Tf 485 564 Td (INR 59,000) Tj ET
+BT /F1 10 Tf 50 536 Td (Amount Paid: INR 20,000) Tj ET
+BT /F1 10 Tf 430 536 Td (Balance Due: INR 39,000) Tj ET
+BT /F2 9 Tf 50 496 Td (Bank Details:) Tj ET
+BT /F1 9 Tf 50 484 Td (State Bank " A/C 12345678901 " IFSC SBIN0001234) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000001741 00000 n 
+0000001811 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1886
+%%EOF

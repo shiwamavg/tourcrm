@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings — Sikkim Trails Travel</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <script>window.API_BASE = 'http://localhost:3000';</script>
+</head>
+<body>
+
+<header class="topbar">
+    <div class="wrap">
+        <a class="brand" href="dashboard.html">
+            <span class="logo">🏔️</span>
+            <span class="name">Sikkim Trails Travel<small>Customer Portal</small></span>
+        </a>
+        <nav class="topbar-nav">
+            <a href="dashboard.html">My bookings</a>
+            <a href="quote.html">Request a quote</a>
+            <a href="reviews.html">Reviews</a>
+        </nav>
+        <div data-topbar-user></div>
+    </div>
+</header>
+
+<main>
+    <div class="page-title">
+        <h1>📦 My Bookings</h1>
+        <span class="sub" id="welcome"></span>
+    </div>
+
+    <div data-alert></div>
+
+    <div class="card">
+        <h2>Your trips with us</h2>
+        <div id="bookingsArea">
+            <p class="muted"><span class="spinner"></span> Loading your bookings…</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>⭐ Recent reviews from other travellers</h2>
+        <div id="reviewsArea">
+            <p class="muted"><span class="spinner"></span> Loading reviews…</p>
+        </div>
+    </div>
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>Sikkim Trails Travel</h4>
+                <p>M.G. Marg, Gangtok, Sikkim 737101, India</p>
+                <p>📞 +91 98765 43210 • ✉ bookings@sikkimtrails.demo</p>
+            </div>
+            <div>
+                <h4>Need help?</h4>
+                <p>Call our support team 9 am – 7 pm IST, all 7 days.</p>
+                <p>📞 +91 98321 23456 • ✉ support@sikkimtrails.demo</p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> Sikkim Trails Travel.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    if (!Auth.require()) {} // redirects to login
+
+    Auth.renderTopbar();
+    document.getElementById('welcome').textContent = `— signed in as ${Auth.email}`;
+
+    // Load bookings
+    (async () => {
+        try {
+            const r = await API.myBookings(Auth.token);
+            const items = r.items || [];
+            const area = document.getElementById('bookingsArea');
+            if (!items.length) {
+                area.innerHTML = `
+                    <div class="empty">
+                        <div class="icon">📋</div>
+                        <p>No bookings on this email yet.</p>
+                        <p class="muted">If you recently booked a trip, the email on file might differ.
+                        <a href="#" onclick="Auth.logout()">Try a different email</a>.</p>
+                    </div>`;
+                return;
+            }
+            area.innerHTML = `
+                <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Booking #</th><th>Trip</th><th>Dates</th>
+                            <th class="num">Total</th><th class="num">Paid</th>
+                            <th>Status</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(b => `
+                            <tr>
+                                <td><strong>${escapeHtml(b.booking_number)}</strong></td>
+                                <td>${escapeHtml(b.destination_name || b.destination_text || '—')}</td>
+                                <td>${formatDate(b.trip_start_date)} → ${formatDate(b.trip_end_date)}</td>
+                                <td class="num">${formatINRShort(b.total_amount)}</td>
+                                <td class="num">${formatINRShort(b.amount_paid)}</td>
+                                <td>
+                                    <span class="badge badge-${b.status}">${b.status}</span>
+                                    <span class="badge badge-${b.payment_status}">${b.payment_status}</span>
+                                </td>
+                                <td><a class="btn btn-sm btn-primary" href="booking-detail.html?id=${b.id}">View →</a></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                </div>`;
+        } catch (err) {
+            if (err.status === 401) { Auth.clear(); location.href = 'index.html'; return; }
+            showAlert('error', 'Failed to load bookings: ' + err.message);
+        }
+    })();
+
+    // Load public reviews
+    (async () => {
+        try {
+            const r = await API.publicReviews();
+            const items = r.items || [];
+            const area = document.getElementById('reviewsArea');
+            if (!items.length) {
+                area.innerHTML = `<p class="muted">No reviews yet — be the first!</p>`;
+                return;
+            }
+            area.innerHTML = `
+                <p class="muted">${r.total} reviews • Average ★ ${r.avg_rating}/5</p>
+                ${items.slice(0, 5).map(rv => `
+                    <div class="review-card">
+                        <div class="stars">${'★'.repeat(rv.rating)}${'☆'.repeat(5 - rv.rating)}</div>
+                        ${rv.title ? `<strong>${escapeHtml(rv.title)}</strong><br>` : ''}
+                        <p>${escapeHtml(rv.comment)}</p>
+                        <div class="by">— ${escapeHtml(rv.customer_name)} • ${rv.destination_name ? escapeHtml(rv.destination_name) + ' • ' : ''}${formatDate(rv.created_at)}</div>
+                    </div>
+                `).join('')}
+            `;
+        } catch (err) {
+            document.getElementById('reviewsArea').innerHTML = `<p class="muted">Reviews could not be loaded.</p>`;
+        }
+    })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tour_crm
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd='mysqladmin ping --silent'
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: tour_crm
+      JWT_SECRET: dev_secret_change_me
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            mysqladmin ping -h127.0.0.1 -uroot -proot && break || sleep 2;
+          done
+
+      - name: Install mysql client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+
+      - name: Run schema migrations
+        run: |
+          mysql -h127.0.0.1 -uroot -proot < backend/migrations/001_initial_schema.sql
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/002_bookings.sql
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/003_sikkim_seed.sql
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/004_quotation_revisions.sql
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/005_payments_invoices_reviews.sql
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/006_agency_settings_extras.sql || true
+          mysql -h127.0.0.1 -uroot -proot tour_crm < backend/migrations/011_saas_multitenant.sql || true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --no-fund --no-audit || npm install --no-fund --no-audit
+
+      - name: Start backend server
+        working-directory: backend
+        run: |
+          node src/server.js &
+          # wait for server
+          for i in {1..20}; do
+            curl -sS http://localhost:3000/api/health && break || sleep 1;
+          done
+
+      - name: Run provisioning integration tests (native runner)
+        working-directory: backend
+        run: node --test tests/integration/provisioning.node.test.js
