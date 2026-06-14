@@ -71,8 +71,8 @@ async function runSignupFlow() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
-  assert.equal(res.status, 403, 'Pending company login should be blocked');
-  assert.equal(res.body.error, 'Your account is pending approval. Please wait for activation.');
+  assert.equal(res.status, 200, 'Self-service activated company should login successfully');
+  assert.ok(typeof res.body.access_token === 'string');
 
   return { companyId, email, password };
 }
@@ -113,6 +113,25 @@ test('signup-to-activation SaaS flow', async () => {
     const saToken = saResponse.body.access_token;
 
     const signupResult = await runSignupFlow();
+    
+    // Suspend company to test super-admin lifecycle
+    const suspendRes = await fetchJson(`/api/super-admin/companies/${signupResult.companyId}/toggle-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + saToken },
+      body: JSON.stringify({ status: 'suspended' })
+    });
+    assert.equal(suspendRes.status, 200, 'Suspend company failed');
+
+    // Verify suspended login fails
+    const loginFail = await fetchJson('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: signupResult.email, password: signupResult.password })
+    });
+    assert.equal(loginFail.status, 403, 'Suspended login should be blocked');
+    assert.equal(loginFail.body.error, 'Your company account has been suspended. Please contact support.');
+
+    // Reactivate and check login succeeds again
     await approveCompany(saToken, signupResult.companyId);
     await loginTenant(signupResult.email, signupResult.password);
   } finally {

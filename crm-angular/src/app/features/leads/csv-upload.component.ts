@@ -45,7 +45,7 @@ import { ToastService } from '../../core/services/toast.service';
                 <h4 style="margin-top:10px">Optional columns</h4>
                 <code>email</code>, <code>destination_text</code>, <code>source</code>, <code>notes</code>, <code>follow_up_at</code>
                 <p class="muted small" style="margin-top:8px">
-                    <code>source</code> defaults to <strong>csv_upload</strong>. Valid sources: manual, phone, whatsapp, referral, walk_in, website_form, google_sheet, meta_ads, other.
+                    <code>source</code> defaults to <strong>csv_upload</strong>. Valid sources: manual, phone, whatsapp, referral, walk_in, website_form, demo_request, google_sheet, meta_ads, other.
                 </p>
             </div>
         </div>

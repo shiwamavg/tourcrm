@@ -21,14 +21,14 @@ const Auth = {
     require() {
         if (!this.token) {
             const returnTo = encodeURIComponent(location.pathname + location.search);
-            location.href = `index.html?return=${returnTo}`;
+            location.href = `portal.html?return=${returnTo}`;
             return false;
         }
         return true;
     },
     logout() {
         this.clear();
-        location.href = 'index.html';
+        location.href = 'portal.html';
     },
 
     /** Render the topbar user widget. */

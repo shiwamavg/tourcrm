@@ -127,3 +127,45 @@ export class EmailCampaignService {
     update(id: number, body: any): Observable<any> { return this.http.patch(`${this.base}/${id}`, body); }
     delete(id: number): Observable<any> { return this.http.delete(`${this.base}/${id}`); }
 }
+
+@Injectable({ providedIn: 'root' })
+export class B2BService {
+    private http = inject(HttpClient);
+    private base = 'http://localhost:3000/api/b2b';
+
+    listMarketplace(): Observable<any> { return this.http.get<any>(`${this.base}/marketplace`); }
+    shareItem(body: { type: string, id: number, share: boolean }): Observable<any> { return this.http.post(`${this.base}/share`, body); }
+    importItem(body: { type: string, id: number }): Observable<any> { return this.http.post(`${this.base}/import`, body); }
+}
+
+@Injectable({ providedIn: 'root' })
+export class GDSService {
+    private http = inject(HttpClient);
+    private base = 'http://localhost:3000/api/gds';
+
+    searchFlights(params: any): Observable<any> { return this.http.get<any>(`${this.base}/flights`, { params }); }
+    searchHotels(params: any): Observable<any> { return this.http.get<any>(`${this.base}/hotels`, { params }); }
+}
+
+@Injectable({ providedIn: 'root' })
+export class FlyerService {
+    private http = inject(HttpClient);
+    private base = 'http://localhost:3000/api/flyers';
+
+    list(): Observable<any[]> { return this.http.get<any[]>(this.base); }
+    get(id: number): Observable<any> { return this.http.get<any>(`${this.base}/${id}`); }
+    create(body: any): Observable<any> { return this.http.post(this.base, body); }
+    update(id: number, body: any): Observable<any> { return this.http.put(`${this.base}/${id}`, body); }
+    delete(id: number): Observable<any> { return this.http.delete(`${this.base}/${id}`); }
+}
+
+@Injectable({ providedIn: 'root' })
+export class ReportsService {
+    private http = inject(HttpClient);
+    private base = 'http://localhost:3000/api/reports';
+
+    getSalesByAgent(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/sales-by-agent`); }
+    getSalesByDestination(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/sales-by-destination`); }
+    getLeadSources(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/lead-sources`); }
+    getMonthlyRevenue(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/monthly-revenue`); }
+}

@@ -94,6 +94,20 @@
 19. **Currency Management** – Multi-currency support
 20. **Hotel/Flight API Integration** – Real-time rates from suppliers
 
+### SaaS Readiness Gaps (Not Complete)
+The current Tour CRM plan is missing several SaaS-specific capabilities that should be added to the roadmap.
+
+1. **Self-service tenant onboarding** – public agency signup, tenant registration, onboarding wizard, email verification, and initial setup are not yet implemented.
+2. **Billing and subscription lifecycle** – recurring billing, automated renewals, trial→active→expired status transitions, and self-serve plan upgrade/downgrade pages are not complete.
+3. **Payment gateway / webhook completeness** – subscription-specific webhooks, invoice payment reconciliation, saved payment methods, retry logic, and failure handling are not fully covered.
+4. **Tenant-facing subscription management** – company admin APIs/UI for plan management, payment method management, invoice viewing, and billing dashboards are missing.
+5. **Quota and feature enforcement gaps** – many tenant quotas such as bookings, invoices, visas, campaigns, storage, and message/send limits are not enforced, and there is no centralized feature-gate system.
+6. **SaaS operations / observability** – alerts, thresholds, usage dashboards, health checks, and anomaly detection are not part of the current plan.
+7. **Backup / disaster recovery automation** – scheduled backups, retention policy, automated verification, and restore testing workflows are absent.
+8. **Security and multi-tenant hardening** – API rate limiting, tenant-specific rate quotas, and stronger SaaS perimeter controls are not included.
+9. **Documentation and developer experience** – Swagger/OpenAPI, generated API docs, and SaaS onboarding documentation are not present.
+10. **Tenant lifecycle management** – tenant suspend/reactivate flows, expiration cleanup, and lifecycle management tools are lacking.
+
 #### Medium Priority (Nice to Have)
 1. **Mobile App** – For sales team on the go
 2. **AI Recommendations** – Smart suggestions for hotels, itineraries

@@ -142,7 +142,7 @@ const verifySignupOtp = async (req, res, next) => {
         try {
             const [updateResult] = await db.query(
                 `UPDATE companies
-                    SET email_verified_at = NOW()
+                    SET email_verified_at = NOW(), status = 'active'
                   WHERE contact_email = ? AND status = 'pending'
                   ORDER BY id DESC
                   LIMIT 1`,
@@ -197,6 +197,10 @@ const resendSignupOtp = async (req, res, next) => {
 };
 
 const login = async (req, res, next) => {
+    let user = null;
+    let status = 'failed';
+    let reason = null;
+    let companyId = null;
     try {
         const { email, password } = req.body || {};
         if (!email || !password) {
@@ -210,24 +214,48 @@ const login = async (req, res, next) => {
               WHERE su.email = ? LIMIT 1`,
             [email]
         );
-        const user = rows[0];
+        user = rows[0];
+        companyId = user?.company_id || null;
+
+        const logLogin = async (finalStatus, finalReason) => {
+            try {
+                await db.query(
+                    `INSERT INTO staff_login_logs (company_id, user_id, email, status, reason, ip_address, user_agent)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [companyId, user?.id || null, email, finalStatus, finalReason, req.ip || null, req.get('user-agent') || null]
+                );
+            } catch (logErr) {
+                // Never fail login because of logging
+                console.error('Failed to write staff_login_log:', logErr.message);
+            }
+        };
+
         if (!user || !user.is_active) {
+            await logLogin('failed', !user ? 'invalid_credentials' : 'inactive_user');
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         if (user.company_status === 'pending') {
+            await logLogin('failed', 'company_pending');
             return res.status(403).json({ error: 'Your account is pending approval. Please wait for activation.' });
         }
         if (user.company_status === 'suspended') {
+            await logLogin('failed', 'company_suspended');
             return res.status(403).json({ error: 'Your company account has been suspended. Please contact support.' });
         }
         if (user.company_status === 'inactive') {
+            await logLogin('failed', 'company_inactive');
             return res.status(403).json({ error: 'Your company account is inactive. Please contact support.' });
         }
 
         const ok = await bcrypt.compare(password, user.password_hash);
-        if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!ok) {
+            await logLogin('failed', 'invalid_credentials');
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
         await db.query('UPDATE staff_users SET last_login_at = NOW() WHERE id = ?', [user.id]);
+        status = 'success';
+        await logLogin('success', null);
         const token = signToken(user);
         res.json({
             access_token: token,
@@ -241,7 +269,19 @@ const login = async (req, res, next) => {
                 subscription_status: user.subscription_status
             }
         });
-    } catch (err) { next(err); }
+    } catch (err) {
+        // Defensive log on unexpected errors
+        if (user || companyId) {
+            try {
+                await db.query(
+                    `INSERT INTO staff_login_logs (company_id, user_id, email, status, reason, ip_address, user_agent)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [companyId, user?.id || null, req.body?.email || null, 'failed', err.message || 'exception', req.ip || null, req.get('user-agent') || null]
+                );
+            } catch {}
+        }
+        next(err);
+    }
 };
 
 const me = async (req, res, next) => {

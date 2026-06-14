@@ -9,8 +9,8 @@ export const superAdminAuthInterceptor: HttpInterceptorFn = (req, next) => {
     const router = inject(Router);
     const token = auth.getToken();
 
-    // Only intercept super-admin API calls
-    if (!req.url.includes('/api/super-admin')) {
+    // Only intercept super-admin and monitor API calls
+    if (!req.url.includes('/api/super-admin') && !req.url.includes('/api/monitor')) {
         return next(req);
     }
 

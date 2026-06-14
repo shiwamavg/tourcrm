@@ -328,4 +328,106 @@ export class ApiService {
     deleteFollowup(id: number | string): Observable<{ message: string }> {
         return this.http.delete<{ message: string }>(`${this.base}/followups/${id}`);
     }
+
+    // ── Tenant Billing ───────────────────────────────────────────
+    getBillingPlan(): Observable<any> {
+        return this.http.get(`${this.base}/billing/current`);
+    }
+    getBillingInvoices(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/billing/invoices`);
+    }
+    upgradeBillingPlan(packageId: number, billingCycle: string): Observable<any> {
+        return this.http.post(`${this.base}/billing/upgrade`, { package_id: packageId, billing_cycle: billingCycle });
+    }
+
+    // ── Message Templates ───────────────────────────────────────
+    listMessageTemplates(params: { category?: string; channel?: string } = {}): Observable<any[]> {
+        let p = new HttpParams();
+        if (params.category) p = p.set('category', params.category);
+        if (params.channel) p = p.set('channel', params.channel);
+        return this.http.get<any[]>(`${this.base}/message-templates`, { params: p });
+    }
+    getMessageTemplate(id: number | string): Observable<any> {
+        return this.http.get<any>(`${this.base}/message-templates/${id}`);
+    }
+    createMessageTemplate(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/message-templates`, body);
+    }
+    updateMessageTemplate(id: number | string, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/message-templates/${id}`, body);
+    }
+    deleteMessageTemplate(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/message-templates/${id}`);
+    }
+
+    // ── Payment Reminders ───────────────────────────────────────
+    listPaymentReminderSchedules(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/payment-reminders`);
+    }
+    createPaymentReminderSchedule(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/payment-reminders`, body);
+    }
+    updatePaymentReminderSchedule(id: number | string, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/payment-reminders/${id}`, body);
+    }
+    deletePaymentReminderSchedule(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/payment-reminders/${id}`);
+    }
+    listPaymentReminderLogs(params: { booking_id?: number; status?: string; page?: number; limit?: number } = {}): Observable<any> {
+        let p = new HttpParams();
+        if (params.booking_id) p = p.set('booking_id', String(params.booking_id));
+        if (params.status) p = p.set('status', params.status);
+        if (params.page) p = p.set('page', String(params.page));
+        if (params.limit) p = p.set('limit', String(params.limit));
+        return this.http.get<any>(`${this.base}/payment-reminders/logs`, { params: p });
+    }
+
+    // ── Follow-up Sequences ─────────────────────────────────────
+    listFollowupSequences(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/followup-sequences`);
+    }
+    getFollowupSequence(id: number | string): Observable<any> {
+        return this.http.get<any>(`${this.base}/followup-sequences/${id}`);
+    }
+    createFollowupSequence(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/followup-sequences`, body);
+    }
+    updateFollowupSequence(id: number | string, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/followup-sequences/${id}`, body);
+    }
+    deleteFollowupSequence(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/followup-sequences/${id}`);
+    }
+
+    // ── Booking Tasks ───────────────────────────────────────────
+    listBookingTaskTemplates(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/booking-tasks/templates`);
+    }
+    createBookingTaskTemplate(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/booking-tasks/templates`, body);
+    }
+    updateBookingTaskTemplate(id: number | string, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/booking-tasks/templates/${id}`, body);
+    }
+    deleteBookingTaskTemplate(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/booking-tasks/templates/${id}`);
+    }
+    listBookingTasks(bookingId: number | string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/booking-tasks/booking/${bookingId}`);
+    }
+    createBookingTask(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/booking-tasks`, body);
+    }
+    toggleBookingTask(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.post<{ ok: boolean }>(`${this.base}/booking-tasks/${id}/toggle`, {});
+    }
+    deleteBookingTask(id: number | string): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/booking-tasks/${id}`);
+    }
+
+    // ── GST Reports ─────────────────────────────────────────────
+    getGstReport(from: string, to: string): Observable<any> {
+        let p = new HttpParams().set('from', from).set('to', to);
+        return this.http.get<any>(`${this.base}/reports/gst`, { params: p });
+    }
 }

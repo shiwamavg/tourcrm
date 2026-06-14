@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -25,6 +25,53 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
     @if (loading()) {
         <div class="card text-center"><span class="spinner"></span> Loading…</div>
     } @else {
+        <!-- Onboarding Wizard Checklist -->
+        @if (showOnboarding()) {
+            <div class="card onboarding-card" style="margin-bottom: 24px; border-left: 5px solid #10b981; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
+                <div style="display:flex; justify-content:space-between; align-items:start">
+                    <div>
+                        <h2 style="margin:0 0 8px; border:none; padding:0; font-size: 1.25rem;">🚀 Welcome to your new CRM! Let's get set up</h2>
+                        <p class="text-muted" style="margin:0 0 16px; font-size: 0.9rem;">Complete these key steps to get your agency running on our SaaS platform.</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline" (click)="dismissOnboarding()">Dismiss</button>
+                </div>
+                <div class="onboarding-steps" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top: 12px;">
+                    <div class="onboarding-step" [class.done]="settingsCompleted()" style="background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; gap: 12px;">
+                        <span class="step-check" [style.background]="settingsCompleted() ? '#10b981' : '#fff'" [style.color]="settingsCompleted() ? '#fff' : '#6b7280'" [style.border-color]="settingsCompleted() ? '#10b981' : '#d1d5db'" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #d1d5db; font-weight: 700; flex-shrink: 0;">{{ settingsCompleted() ? '✓' : '1' }}</span>
+                        <div class="step-info" style="font-size: 13px;">
+                            <strong style="display: block; font-size: 14px; color: #111827; margin-bottom: 2px;">Agency Settings</strong>
+                            <p style="margin: 0 0 6px; color: #6b7280; font-size: 12px;">Update logo & billing info.</p>
+                            <a routerLink="/admin/settings" style="color: #0f766e; font-weight: 600; text-decoration: none;">Go to Settings →</a>
+                        </div>
+                    </div>
+                    <div class="onboarding-step" [class.done]="destinationsCount() > 0" style="background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; gap: 12px;">
+                        <span class="step-check" [style.background]="destinationsCount() > 0 ? '#10b981' : '#fff'" [style.color]="destinationsCount() > 0 ? '#fff' : '#6b7280'" [style.border-color]="destinationsCount() > 0 ? '#10b981' : '#d1d5db'" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #d1d5db; font-weight: 700; flex-shrink: 0;">{{ destinationsCount() > 0 ? '✓' : '2' }}</span>
+                        <div class="step-info" style="font-size: 13px;">
+                            <strong style="display: block; font-size: 14px; color: #111827; margin-bottom: 2px;">Add Destination</strong>
+                            <p style="margin: 0 0 6px; color: #6b7280; font-size: 12px;">Define your travel packages.</p>
+                            <a routerLink="/admin/destinations" style="color: #0f766e; font-weight: 600; text-decoration: none;">Add Destination →</a>
+                        </div>
+                    </div>
+                    <div class="onboarding-step" [class.done]="hotelRatesCount() > 0" style="background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; gap: 12px;">
+                        <span class="step-check" [style.background]="hotelRatesCount() > 0 ? '#10b981' : '#fff'" [style.color]="hotelRatesCount() > 0 ? '#fff' : '#6b7280'" [style.border-color]="hotelRatesCount() > 0 ? '#10b981' : '#d1d5db'" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #d1d5db; font-weight: 700; flex-shrink: 0;">{{ hotelRatesCount() > 0 ? '✓' : '3' }}</span>
+                        <div class="step-info" style="font-size: 13px;">
+                            <strong style="display: block; font-size: 14px; color: #111827; margin-bottom: 2px;">Add Rates</strong>
+                            <p style="margin: 0 0 6px; color: #6b7280; font-size: 12px;">Upload contracted hotel pricing.</p>
+                            <a routerLink="/admin/hotel-rates" style="color: #0f766e; font-weight: 600; text-decoration: none;">Configure Rates →</a>
+                        </div>
+                    </div>
+                    <div class="onboarding-step" [class.done]="(leadStats()?.totals?.total || 0) > 0" style="background: #fff; padding: 14px; border-radius: 8px; border: 1px solid #e5e7eb; display: flex; gap: 12px;">
+                        <span class="step-check" [style.background]="(leadStats()?.totals?.total || 0) > 0 ? '#10b981' : '#fff'" [style.color]="(leadStats()?.totals?.total || 0) > 0 ? '#fff' : '#6b7280'" [style.border-color]="(leadStats()?.totals?.total || 0) > 0 ? '#10b981' : '#d1d5db'" style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid #d1d5db; font-weight: 700; flex-shrink: 0;">{{ (leadStats()?.totals?.total || 0) > 0 ? '✓' : '4' }}</span>
+                        <div class="step-info" style="font-size: 13px;">
+                            <strong style="display: block; font-size: 14px; color: #111827; margin-bottom: 2px;">Create Lead</strong>
+                            <p style="margin: 0 0 6px; color: #6b7280; font-size: 12px;">Log client query to start conversion.</p>
+                            <a routerLink="/leads/new" style="color: #0f766e; font-weight: 600; text-decoration: none;">Log a Lead →</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         <!-- Quick action tiles -->
         <div class="quick-tiles">
             <a routerLink="/leads" class="qtile">
@@ -219,6 +266,7 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
         .src-meta_ads    { background: #fef3c7; color: #92400e; }
         .src-walk_in     { background: #dbeafe; color: #1e40af; }
         .src-website_form{ background: #e0e7ff; color: #3730a3; }
+        .src-demo_request{ background: #ccfbf1; color: #0f766e; }
         .src-csv_upload  { background: #fae8ff; color: #6b21a8; }
         .src-referral    { background: #d1fae5; color: #065f46; }
         .src-whatsapp    { background: #d1fae5; color: #065f46; }
@@ -247,6 +295,25 @@ export class DashboardComponent implements OnInit {
     reminderStats = signal<any>(null);
     todayFollowups = signal<any[]>([]);
 
+    // Onboarding checklist
+    destinationsCount = signal(0);
+    hotelRatesCount = signal(0);
+    settingsCompleted = signal(false);
+    onboardingDismissed = signal(localStorage.getItem('dismiss_onboarding') === 'true');
+
+    showOnboarding = computed(() => {
+        return !this.onboardingDismissed() && 
+            (this.destinationsCount() === 0 || 
+             this.hotelRatesCount() === 0 || 
+             !this.settingsCompleted() || 
+             (this.leadStats()?.totals?.total || 0) === 0);
+    });
+
+    dismissOnboarding() {
+        localStorage.setItem('dismiss_onboarding', 'true');
+        this.onboardingDismissed.set(true);
+    }
+
     dismissReminder(id: number) {
         this.reminderApi.dismiss(id).subscribe(() => {
             this.todayFollowups.update(list => list.filter((r: any) => r.id !== id));
@@ -257,7 +324,7 @@ export class DashboardComponent implements OnInit {
     ngOnInit() {
         // Load all data in parallel
         let done = 0;
-        const total = 7;
+        const total = 10;
         const check = () => { if (++done >= total) this.loading.set(false); };
 
         this.api.stats().subscribe({
@@ -286,6 +353,21 @@ export class DashboardComponent implements OnInit {
         });
         this.api.getReminderStats().subscribe({
             next: r => { this.reminderStats.set(r); this.todayFollowups.set(r.todayList || []); check(); },
+            error: () => check()
+        });
+        this.api.listDestinations({ limit: 1 }).subscribe({
+            next: r => { this.destinationsCount.set(r.total || 0); check(); },
+            error: () => check()
+        });
+        this.api.listHotelRates({ limit: 1 }).subscribe({
+            next: r => { this.hotelRatesCount.set(r.total || 0); check(); },
+            error: () => check()
+        });
+        this.api.getSettings().subscribe({
+            next: s => {
+                this.settingsCompleted.set(s && s.email && s.email !== 'bookings@sikkimtrails.demo' ? true : false);
+                check();
+            },
             error: () => check()
         });
     }

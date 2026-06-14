@@ -3,241 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Request a Custom Quote — Sikkim Trails Travel</title>
-    <link rel="stylesheet" href="css/portal.css">
+    <title>Request a Demo — TourCRM</title>
+    <meta name="description" content="Book a free TourCRM demo. See how travel agencies use our CRM to manage leads, quotations, bookings, and payments.">
+    <link rel="stylesheet" href="css/marketing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        window.API_BASE = 'http://localhost:3000';
+    </script>
     <style>
-        .quote-hero {
-            background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
-            color: #fff;
-            padding: 48px 24px 40px;
-            text-align: center;
-        }
-        .quote-hero h1 { margin: 0 0 8px; font-size: 32px; }
-        .quote-hero p  { margin: 0; opacity: .9; max-width: 600px; margin: 0 auto; }
-        .quote-wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px 60px; }
-        .quote-form {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,.04);
-            padding: 28px 32px;
-        }
-        .quote-form h2 { margin: 0 0 6px; }
-        .quote-form .lede { color: #6b7280; margin: 0 0 18px; font-size: 14px; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
-        .form-grid .span-2 { grid-column: span 2; }
-        .form-group { display: flex; flex-direction: column; gap: 4px; }
-        .form-group label { font-size: 13px; color: #374151; font-weight: 500; }
-        .req { color: #dc2626; }
-        .form-group input, .form-group select, .form-group textarea {
-            padding: 9px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font: inherit;
-            background: #fff;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: #0f766e;
-            box-shadow: 0 0 0 3px rgba(15,118,110,.1);
-        }
-        .form-group textarea { resize: vertical; min-height: 70px; }
-        .form-group .hint { font-size: 11px; color: #6b7280; }
-        .submit-row {
-            display: flex; gap: 10px; align-items: center;
-            justify-content: space-between; margin-top: 22px;
-            padding-top: 18px; border-top: 1px solid #f3f4f6;
-        }
-        .submit-row .assurance { font-size: 12px; color: #6b7280; }
-        .submit-row .assurance::before { content: '🔒 '; }
-        .alert {
-            padding: 12px 14px; border-radius: 8px; font-size: 14px;
-            margin: 0 0 16px;
-        }
-        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-        .alert-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-        .alert-warn    { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
-        .info-cards {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px; margin: 24px 0 0;
-        }
-        .info-card {
-            background: #f9fafb; border-radius: 8px; padding: 14px 16px;
-            display: flex; align-items: flex-start; gap: 10px;
-        }
-        .info-card .icon { font-size: 20px; }
-        .info-card h4 { margin: 0 0 2px; font-size: 13px; }
-        .info-card p  { margin: 0; font-size: 12px; color: #6b7280; }
-        .site-header {
-            background: #fff; border-bottom: 1px solid #e5e7eb;
-            padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;
-        }
-        .site-header .brand { font-weight: 700; color: #0f766e; }
-        .site-header nav a {
-            color: #374151; text-decoration: none; margin-left: 16px; font-size: 14px;
-        }
-        .site-header nav a:hover { color: #0f766e; }
-        @media (max-width: 600px) {
-            .form-grid { grid-template-columns: 1fr; }
-            .form-grid .span-2 { grid-column: span 1; }
-            .quote-form { padding: 20px 18px; }
+        .page-hero { background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%); color: #fff; padding: 70px 0 60px; text-align: center; }
+        .page-hero h1 { color: #fff; margin-bottom: 10px; }
+        .page-hero p { color: rgba(255,255,255,.9); max-width: 600px; margin: 0 auto; }
+        .demo-section { padding: 50px 0 90px; }
+        .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+        .demo-info h2 { font-size: 1.5rem; margin-bottom: 16px; }
+        .demo-info p { color: var(--gray-500); margin-bottom: 20px; }
+        .check-list { list-style: none; padding: 0; margin: 0 0 24px; }
+        .check-list li { padding: 8px 0 8px 28px; position: relative; }
+        .check-list li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+        .demo-form { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: 32px; }
+        @media (max-width: 860px) {
+            .demo-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
 <header class="site-header">
-    <div class="brand">🏔️ Sikkim Trails Travel</div>
-    <nav>
-        <a href="index.html">Sign in</a>
-        <a href="dashboard.html">My bookings</a>
-        <a href="quote.html">Request a quote</a>
-        <a href="reviews.html">Reviews</a>
-    </nav>
+    <div class="container">
+        <a href="index.html" class="brand">
+            <span class="logo">🏔️</span>
+            <span>TourCRM</span>
+        </a>
+        <nav class="main-nav" id="mainNav">
+            <a href="index.html#features">Features</a>
+            <a href="index.html#benefits">Benefits</a>
+            <a href="index.html#pricing">Pricing</a>
+            <a href="reviews.html">Reviews</a>
+            <a href="quote.html" class="btn btn-primary btn-sm">Request Demo</a>
+        </nav>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">☰</button>
+    </div>
 </header>
 
-<section class="quote-hero">
-    <h1>Plan your perfect trip</h1>
-    <p>Tell us where you want to go and we'll craft a custom itinerary — usually within 24 hours.</p>
+<section class="page-hero">
+    <div class="container">
+        <h1>See TourCRM in action</h1>
+        <p>Schedule a free 30-minute demo with our team. We'll show you how to convert more leads and manage bookings in one place.</p>
+    </div>
 </section>
 
-<main class="quote-wrap">
-    <div id="formContainer">
-        <form id="quoteForm" class="quote-form" novalidate>
-            <h2>Trip enquiry</h2>
-            <p class="lede">All fields marked <span class="req">*</span> are required.</p>
-
-            <div id="alertSlot"></div>
-
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="full_name">Your name <span class="req">*</span></label>
-                    <input id="full_name" name="full_name" type="text" required>
-                </div>
-                <div class="form-group">
-                    <label for="phone">Phone <span class="req">*</span></label>
-                    <input id="phone" name="phone" type="tel" required
-                           placeholder="+91 98xxx xxxxx">
-                </div>
-                <div class="form-group">
-                    <label for="email">Email <span class="req">*</span></label>
-                    <input id="email" name="email" type="email" required
-                           placeholder="you@example.com">
-                </div>
-                <div class="form-group">
-                    <label for="travellers">Number of travellers</label>
-                    <select id="travellers" name="travellers">
-                        <option value="">—</option>
-                        <option>1 adult</option>
-                        <option>2 adults</option>
-                        <option>2 adults + 1 child</option>
-                        <option>2 adults + 2 children</option>
-                        <option>Family of 4+</option>
-                        <option>Group of 6+</option>
-                    </select>
-                </div>
-                <div class="form-group span-2">
-                    <label for="destination_text">Where do you want to go? <span class="req">*</span></label>
-                    <input id="destination_text" name="destination_text" type="text" required
-                           placeholder="e.g. Gangtok + Pelling 5 days, or Bhutan 7 days">
-                </div>
-                <div class="form-group">
-                    <label for="travel_date">Approximate travel date</label>
-                    <input id="travel_date" name="travel_date" type="date">
-                </div>
-                <div class="form-group">
-                    <label for="budget">Budget per person (₹)</label>
-                    <input id="budget" name="budget" type="number" min="0" step="1000"
-                           placeholder="e.g. 25000">
-                </div>
-                <div class="form-group span-2">
-                    <label for="notes">Anything else we should know?</label>
-                    <textarea id="notes" name="notes"
-                              placeholder="Hotel preferences, food restrictions, special occasions…"></textarea>
-                    <span class="hint">Optional, but helps us tailor the itinerary.</span>
-                </div>
+<section class="demo-section">
+    <div class="container">
+        <div class="demo-grid">
+            <div class="demo-info">
+                <h2>What you'll learn in the demo</h2>
+                <ul class="check-list">
+                    <li>How to capture and assign leads from website, ads & WhatsApp</li>
+                    <li>How to build a multi-day quotation in under 5 minutes</li>
+                    <li>How to convert quotes into bookings and track payments</li>
+                    <li>How the customer portal improves client experience</li>
+                    <li>How reports show revenue, conversion rates, and team performance</li>
+                </ul>
+                <p>Prefer to explore on your own? <a href="portal.html">Sign in to the customer portal</a> with one of our demo accounts.</p>
             </div>
-
-            <div class="submit-row">
-                <span class="assurance">Your details stay private — we use them only to plan your trip.</span>
-                <button type="submit" class="btn btn-accent" id="submitBtn">
-                    ✉️ Send enquiry
-                </button>
-            </div>
-        </form>
-
-        <div class="info-cards">
-            <div class="info-card">
-                <span class="icon">⏱️</span>
-                <div>
-                    <h4>24-hour reply</h4>
-                    <p>Our travel team will get back to you with a draft itinerary.</p>
-                </div>
-            </div>
-            <div class="info-card">
-                <span class="icon">💰</span>
-                <div>
-                    <h4>Free & no obligation</h4>
-                    <p>No payment now. You only pay once you confirm the trip.</p>
-                </div>
-            </div>
-            <div class="info-card">
-                <span class="icon">🤝</span>
-                <div>
-                    <h4>Local experts</h4>
-                    <p>Born-and-raised Sikkim planners — we know every hidden monastery.</p>
+            <div>
+                <form id="demoForm" class="demo-form">
+                    <h3 style="margin-bottom:6px;">Request your free demo</h3>
+                    <p class="muted" style="margin-bottom:18px;">All fields marked <span style="color:var(--danger)">*</span> are required.</p>
+                    <div id="alertSlot"></div>
+                    <div class="form-group">
+                        <label for="full_name">Your name <span style="color:var(--danger)">*</span></label>
+                        <input id="full_name" name="full_name" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agency_name">Agency name <span style="color:var(--danger)">*</span></label>
+                        <input id="agency_name" name="agency_name" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone <span style="color:var(--danger)">*</span></label>
+                        <input id="phone" name="phone" type="tel" required placeholder="+91 98xxx xxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email <span style="color:var(--danger)">*</span></label>
+                        <input id="email" name="email" type="email" required placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="team_size">Team size</label>
+                        <select id="team_size" name="team_size">
+                            <option value="">—</option>
+                            <option>Just me</option>
+                            <option>2–5 people</option>
+                            <option>6–15 people</option>
+                            <option>16+ people</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">What challenges are you trying to solve?</label>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Lead follow-ups, quotations, payments, etc."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Request Demo</button>
+                </form>
+                <div id="successBox" style="display:none;" class="demo-form text-center">
+                    <div style="font-size:56px;line-height:1;margin-bottom:12px;">✅</div>
+                    <h3>Demo request received!</h3>
+                    <p style="color:var(--gray-500);">Thanks, <span id="successName"></span>. Our team will call you within 24 hours.</p>
+                    <a href="index.html" class="btn btn-outline">Back to home</a>
                 </div>
             </div>
         </div>
     </div>
+</section>
 
-    <div id="successContainer" style="display:none">
-        <div class="quote-form">
-            <div style="text-align:center;padding:20px 0">
-                <div style="font-size:56px;line-height:1">✅</div>
-                <h2>Enquiry received!</h2>
-                <p class="lede">Thank you, <span id="successName"></span>. Your reference is
-                <strong id="successRef"></strong>.</p>
-                <p>Our travel team will reach out within 24 hours. In the meantime, you can
-                <a href="dashboard.html">sign in</a> to see all your enquiries.</p>
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div>
+                <a href="index.html" class="brand">
+                    <span class="logo">🏔️</span>
+                    <span>TourCRM</span>
+                </a>
+                <p>CRM software built for tour operators, DMCs, and travel agencies who want to convert more leads and manage bookings effortlessly.</p>
+            </div>
+            <div>
+                <h4>Product</h4>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#pricing">Pricing</a>
+                <a href="reviews.html">Reviews</a>
+                <a href="portal.html">Customer portal</a>
+            </div>
+            <div>
+                <h4>Resources</h4>
+                <a href="quote.html">Request demo</a>
+                <a href="reviews.html">Customer stories</a>
+                <a href="#">Help center</a>
+                <a href="#">API docs</a>
+            </div>
+            <div>
+                <h4>Company</h4>
+                <a href="#">About us</a>
+                <a href="#">Contact</a>
+                <a href="#">Privacy policy</a>
+                <a href="#">Terms of service</a>
             </div>
         </div>
+        <div class="copy">
+            <div>© <span id="year"></span> TourCRM. All rights reserved.</div>
+            <div>Made for tour & travel agencies.</div>
+        </div>
     </div>
-</main>
+</footer>
 
 <script>
-(function () {
-    const form   = document.getElementById('quoteForm');
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mainNav = document.getElementById('mainNav');
+    mobileMenuBtn.addEventListener('click', () => {
+        mainNav.classList.toggle('open');
+        mobileMenuBtn.textContent = mainNav.classList.contains('open') ? '✕' : '☰';
+    });
+
+    const form = document.getElementById('demoForm');
     const alertSlot = document.getElementById('alertSlot');
     const submitBtn = document.getElementById('submitBtn');
-    const formContainer = document.getElementById('formContainer');
-    const successContainer = document.getElementById('successContainer');
+    const successBox = document.getElementById('successBox');
     const successName = document.getElementById('successName');
-    const successRef  = document.getElementById('successRef');
-
-    const BACKEND = 'http://localhost:3000';
+    const BACKEND = window.API_BASE || 'http://localhost:3000';
 
     function showAlert(type, msg) {
         alertSlot.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
-        alertSlot.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         alertSlot.innerHTML = '';
         const data = {
-            full_name:        form.full_name.value.trim(),
-            phone:            form.phone.value.trim(),
-            email:            form.email.value.trim(),
-            destination_text: form.destination_text.value.trim(),
-            travellers:       form.travellers.value,
-            travel_date:      form.travel_date.value,
-            budget:           form.budget.value,
-            notes:            form.notes.value.trim()
+            full_name: form.full_name.value.trim(),
+            phone: form.phone.value.trim(),
+            email: form.email.value.trim(),
+            destination_text: 'TourCRM demo request from ' + form.agency_name.value.trim(),
+            notes: `Agency: ${form.agency_name.value.trim()}\nTeam size: ${form.team_size.value || '-'}\nChallenges: ${form.notes.value.trim()}`,
+            source: 'demo_request'
         };
-        if (!data.full_name || !data.phone || !data.email || !data.destination_text) {
-            showAlert('error', 'Please fill in your name, phone, email, and destination.');
+        if (!data.full_name || !data.phone || !data.email || !form.agency_name.value.trim()) {
+            showAlert('error', 'Please fill in your name, agency name, phone, and email.');
             return;
         }
         submitBtn.disabled = true;
@@ -250,26 +200,20 @@
             });
             const j = await r.json().catch(() => ({}));
             if (!r.ok) {
-                showAlert('error', j.error || 'Submission failed. Please email bookings@sikkimtrails.demo or call +91 98765 43210.');
+                showAlert('error', j.error || 'Submission failed. Please try again or call us.');
                 return;
             }
-            // Success
             successName.textContent = data.full_name.split(' ')[0];
-            successRef.textContent  = 'LEAD-' + String(j.lead_id).padStart(5, '0');
-            formContainer.style.display = 'none';
-            successContainer.style.display = 'block';
-            successContainer.scrollIntoView({ behavior: 'smooth' });
+            form.style.display = 'none';
+            successBox.style.display = 'block';
+            successBox.scrollIntoView({ behavior: 'smooth' });
         } catch (err) {
-            showAlert('error',
-                'Could not reach our server. Please email ' +
-                '<a href="mailto:bookings@sikkimtrails.demo">bookings@sikkimtrails.demo</a> ' +
-                'or call +91 98765 43210.');
+            showAlert('error', 'Could not reach our server. Please try again later.');
         } finally {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '✉️ Send enquiry';
+            submitBtn.innerHTML = 'Request Demo';
         }
     });
-})();
 </script>
 
 </body>

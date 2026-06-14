@@ -104,6 +104,7 @@ export class LeadNewComponent {
         { value: 'whatsapp',     label: 'WhatsApp' },
         { value: 'referral',     label: 'Referral' },
         { value: 'website_form', label: 'Website form' },
+        { value: 'demo_request', label: 'Demo request' },
         { value: 'google_sheet', label: 'Google Sheet' },
         { value: 'csv_upload',   label: 'CSV upload' },
         { value: 'meta_ads',     label: 'Meta Ads' },

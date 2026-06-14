@@ -3,22 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Bookings — Sikkim Trails Travel</title>
+    <title>My Bookings — TourCRM Customer Portal</title>
     <link rel="stylesheet" href="css/portal.css">
+    <link rel="stylesheet" href="css/marketing.css">
     <script>window.API_BASE = 'http://localhost:3000';</script>
+    <style>
+        .portal-nav { background: #fff; border-bottom: 1px solid var(--gray-200); }
+        .portal-nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+        .portal-nav .brand { color: var(--gray-900); display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; }
+        .portal-nav .brand .logo { width: 34px; height: 34px; border-radius: 8px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .portal-nav nav a { color: var(--gray-700); font-size: 14px; margin-left: 18px; }
+        .portal-nav .email { font-size: 13px; margin-right: 12px; }
+        .portal-nav button { background: rgba(15,118,110,.1); color: var(--primary); border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    </style>
 </head>
 <body>
 
-<header class="topbar">
+<header class="portal-nav">
     <div class="wrap">
-        <a class="brand" href="dashboard.html">
+        <a href="index.html" class="brand">
             <span class="logo">🏔️</span>
-            <span class="name">Sikkim Trails Travel<small>Customer Portal</small></span>
+            <span>TourCRM</span>
         </a>
-        <nav class="topbar-nav">
+        <nav>
             <a href="dashboard.html">My bookings</a>
-            <a href="quote.html">Request a quote</a>
             <a href="reviews.html">Reviews</a>
+            <a href="index.html">Home</a>
         </nav>
         <div data-topbar-user></div>
     </div>
@@ -33,7 +43,7 @@
     <div data-alert></div>
 
     <div class="card">
-        <h2>Your trips with us</h2>
+        <h2>Your trips</h2>
         <div id="bookingsArea">
             <p class="muted"><span class="spinner"></span> Loading your bookings…</p>
         </div>
@@ -51,17 +61,17 @@
     <div class="wrap">
         <div class="row">
             <div>
-                <h4>Sikkim Trails Travel</h4>
-                <p>M.G. Marg, Gangtok, Sikkim 737101, India</p>
-                <p>📞 +91 98765 43210 • ✉ bookings@sikkimtrails.demo</p>
+                <h4>TourCRM</h4>
+                <p>CRM software for tour & travel agencies</p>
+                <p>✉ support@tourcrm.example.com</p>
             </div>
             <div>
                 <h4>Need help?</h4>
-                <p>Call our support team 9 am – 7 pm IST, all 7 days.</p>
-                <p>📞 +91 98321 23456 • ✉ support@sikkimtrails.demo</p>
+                <p>Contact your agency or reach TourCRM support.</p>
+                <p>✉ support@tourcrm.example.com</p>
             </div>
         </div>
-        <div class="copy">© <span id="year"></span> Sikkim Trails Travel.</div>
+        <div class="copy">© <span id="year"></span> TourCRM. All rights reserved.</div>
     </div>
 </footer>
 
@@ -119,7 +129,7 @@
                 </table>
                 </div>`;
         } catch (err) {
-            if (err.status === 401) { Auth.clear(); location.href = 'index.html'; return; }
+            if (err.status === 401) { Auth.clear(); location.href = 'portal.html'; return; }
             showAlert('error', 'Failed to load bookings: ' + err.message);
         }
     })();

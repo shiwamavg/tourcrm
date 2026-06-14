@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -95,6 +95,12 @@ import { ToastService } from '../../core/services/toast.service';
             }
         </tbody>
     </table>
+
+    <div class="pagination">
+        <button class="btn ghost small" [disabled]="page() <= 1" (click)="prevPage()">Previous</button>
+        <span class="pagination-info">Page {{ page() }} of {{ totalPages() }} (Total: {{ total() }} companies)</span>
+        <button class="btn ghost small" [disabled]="page() >= totalPages()" (click)="nextPage()">Next</button>
+    </div>
     `,
     styles: [`
         h1 { margin:0 0 14px; font-size:1.3rem; }
@@ -120,6 +126,8 @@ import { ToastService } from '../../core/services/toast.service';
         .badge.expired { background:#fef3c7; color:#92400e; }
         .badge.cancelled { background:#e5e7eb; color:#374151; }
         .empty { color:#9ca3af; text-align:center; }
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; }
+        .pagination-info { font-size: 13px; color: #4b5563; font-weight: 500; }
     `]
 })
 export class SaCompaniesComponent implements OnInit {
@@ -135,6 +143,12 @@ export class SaCompaniesComponent implements OnInit {
     statusFilter = '';
     subFilter = '';
 
+    // Pagination signals
+    page = signal(1);
+    total = signal(0);
+    limit = signal(20);
+    totalPages = computed(() => Math.ceil(this.total() / this.limit()) || 1);
+
     form: any = { name: '', contact_name: '', contact_email: '', contact_phone: '', password: '', package_id: '', status: 'active' };
 
     ngOnInit() {
@@ -143,13 +157,39 @@ export class SaCompaniesComponent implements OnInit {
     }
 
     load() {
-        this.api.listCompanies({ q: this.q, status: this.statusFilter, subscription_status: this.subFilter }).subscribe({
-            next: r => this.companies.set(r.companies || []),
+        this.api.listCompanies({
+            q: this.q,
+            status: this.statusFilter,
+            subscription_status: this.subFilter,
+            page: this.page(),
+            limit: this.limit()
+        }).subscribe({
+            next: r => {
+                this.companies.set(r.companies || []);
+                this.total.set(r.total || 0);
+            },
             error: () => this.toast.error('Failed to load companies')
         });
     }
 
-    search() { this.load(); }
+    search() {
+        this.page.set(1);
+        this.load();
+    }
+
+    prevPage() {
+        if (this.page() > 1) {
+            this.page.set(this.page() - 1);
+            this.load();
+        }
+    }
+
+    nextPage() {
+        if (this.page() < this.totalPages()) {
+            this.page.set(this.page() + 1);
+            this.load();
+        }
+    }
 
     openNew() {
         this.editingId.set(null);

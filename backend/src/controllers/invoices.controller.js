@@ -148,6 +148,12 @@ const autoGenerateForBooking = async (bookingId, userId, companyId) => {
     );
     if (existing[0]) return existing[0];
 
+    const { getCompanyQuota } = require('../middleware/quota');
+    const quota = await getCompanyQuota(companyId);
+    if (quota && quota.currentCounts.invoices >= quota.maxInvoices) {
+        throw new Error(`Invoice quota exceeded. You have reached the limit of ${quota.maxInvoices} invoices. Please upgrade your plan.`);
+    }
+
     let quotation = null;
     if (booking.quotation_id) {
         const [q] = await db.query('SELECT * FROM quotations WHERE id = ? AND company_id = ?', [booking.quotation_id, companyId]);
@@ -165,11 +171,19 @@ const autoGenerateForBooking = async (bookingId, userId, companyId) => {
     const settings = await loadSettings(companyId);
     const invoiceNumber = await generateInvoiceNumber(null, companyId);
     const total = Number(booking.total_amount || 0);
-    const taxAmount = Number(booking.booking_fee_amount || 0);
-    const subtotal  = Math.max(0, total - taxAmount);
+    const gstPct = Number(quotation?.gst_pct || 0);
+    const subtotal = gstPct > 0 ? Math.round((total / (1 + gstPct / 100)) * 100) / 100 : total;
+    const taxAmount = Math.max(0, total - subtotal);
+    const cgstAmount = gstPct > 0 ? Math.round((taxAmount / 2) * 100) / 100 : 0;
+    const sgstAmount = gstPct > 0 ? Math.round((taxAmount / 2) * 100) / 100 : 0;
+    const igstAmount = 0; // default intra-state split; can be enhanced with customer state
 
     const buf = buildInvoicePdf(
-        { invoice_number: invoiceNumber, subtotal, tax_amount: taxAmount, total, issued_at: new Date() },
+        {
+            invoice_number: invoiceNumber, subtotal, tax_amount: taxAmount, total,
+            gst_pct: gstPct, cgst_amount: cgstAmount, sgst_amount: sgstAmount, igst_amount: igstAmount,
+            hsn_sac: '9985', issued_at: new Date()
+        },
         bookingForPdf,
         settings
     );
@@ -179,11 +193,12 @@ const autoGenerateForBooking = async (bookingId, userId, companyId) => {
 
     const [r] = await db.query(
         `INSERT INTO invoices
-            (invoice_number, booking_id, quotation_id, subtotal, tax_amount, total,
-             pdf_path, pdf_generated_at, issued_by, notes, company_id)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+            (invoice_number, booking_id, quotation_id, subtotal, gst_pct, cgst_amount, sgst_amount, igst_amount,
+             tax_amount, hsn_sac, total, pdf_path, pdf_generated_at, issued_by, notes, company_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [invoiceNumber, bookingId, booking.quotation_id || null,
-         subtotal, taxAmount, total, fname, new Date(), userId || null,
+         subtotal, gstPct, cgstAmount, sgstAmount, igstAmount,
+         taxAmount, '9985', total, fname, new Date(), userId || null,
          'Auto-generated on first successful payment', companyId]
     );
     return { id: r.insertId, invoice_number: invoiceNumber, pdf_path: fname, total };

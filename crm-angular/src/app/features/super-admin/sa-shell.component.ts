@@ -20,6 +20,9 @@ import { SuperAdminAuthService } from '../../core/services/super-admin-auth.serv
                 <a routerLink="/super-admin/packages" routerLinkActive="active">Packages</a>
                 <a routerLink="/super-admin/payments" routerLinkActive="active">Payments</a>
                 <a routerLink="/super-admin/invoices" routerLinkActive="active">Invoices</a>
+                <a routerLink="/super-admin/observability" routerLinkActive="active">Observability</a>
+                <a routerLink="/super-admin/login-logs" routerLinkActive="active">Login Logs</a>
+                <a routerLink="/super-admin/activity-logs" routerLinkActive="active">Activity Logs</a>
             </nav>
             <div class="sa-footer">
                 <button class="sa-logout" (click)="auth.logout()">Logout</button>

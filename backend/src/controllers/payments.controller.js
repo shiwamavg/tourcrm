@@ -271,8 +271,108 @@ const listByBooking = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+const handleSubscriptionWebhook = async (req, res, next) => {
+    try {
+        const rawBody = req.rawBody || (Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {})));
+        const sig = req.header('x-cashfree-signature') || '';
+
+        if (!cashfree.verifyWebhookSignature(rawBody, sig)) {
+            console.warn('[cashfree subscription webhook] signature verification failed');
+            return res.status(401).json({ error: 'invalid signature' });
+        }
+
+        const payload = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString('utf8') || '{}') : (req.body || {});
+        const event = payload.event;
+        const data = payload.data || {};
+        
+        console.log(`[Subscription Webhook] Event: ${event}, Company ID: ${data.company_id}`);
+
+        const companyId = data.company_id;
+        if (!companyId) return res.status(400).json({ error: 'missing company_id' });
+
+        if (event === 'SUBSCRIPTION_PAYMENT_SUCCESS') {
+            const amount = Number(data.amount || 0);
+            const gstAmount = amount * 0.18;
+            const total = amount + gstAmount;
+
+            const [pkgRows] = await db.query(
+                'SELECT * FROM subscription_packages WHERE id = ?',
+                [data.package_id]
+            );
+            const pkg = pkgRows[0];
+
+            // Record company payment
+            const [cp] = await db.query(
+                `INSERT INTO company_payments 
+                    (company_id, subscription_id, amount, gst_amount, total_amount, gateway, status, paid_at, transaction_id, notes)
+                 VALUES (?, ?, ?, ?, ?, 'cashfree', 'paid', NOW(), ?, ?)`,
+                [companyId, data.subscription_id || null, amount, gstAmount, total, data.transaction_id || null, `SaaS plan renewal via webhook: ${pkg?.name || 'Package'}`]
+            );
+
+            // Update subscription end date on company
+            const duration = data.billing_cycle === 'yearly' ? 'INTERVAL 1 YEAR' : 'INTERVAL 1 MONTH';
+            await db.query(
+                `UPDATE companies 
+                    SET subscription_status = 'active',
+                        status = 'active',
+                        subscription_package_id = ?,
+                        subscription_start_date = CURDATE(),
+                        subscription_end_date = DATE_ADD(CURDATE(), ${duration})
+                  WHERE id = ?`,
+                [data.package_id, companyId]
+            );
+
+            // Mark invoice as paid if invoice_id passed
+            if (data.invoice_id) {
+                await db.query(
+                    `UPDATE company_invoices 
+                        SET status = 'paid', paid_at = NOW() 
+                      WHERE id = ? AND company_id = ?`,
+                    [data.invoice_id, companyId]
+                );
+            }
+            console.log(`[Subscription Reconciled] Successfully renewed package ${pkg?.name} for Company ID: ${companyId}`);
+
+        } else if (event === 'SUBSCRIPTION_CHARGE_FAILED') {
+            console.warn(`[Subscription Charge Failed] Company: ${companyId}, Reason: ${data.reason}`);
+            
+            // Record failed payment
+            await db.query(
+                `INSERT INTO company_payments 
+                    (company_id, subscription_id, amount, total_amount, gateway, status, notes)
+                 VALUES (?, ?, ?, ?, 'cashfree', 'failed', ?)`,
+                [companyId, data.subscription_id || null, Number(data.amount || 0), Number(data.amount || 0), `Failed recurring charge attempt: ${data.reason || 'declined'}`]
+            );
+
+            // Retry logic simulation: increment failure attempts in company settings or metadata.
+            // If failed 3 times, set subscription status to expired.
+            const [payments] = await db.query(
+                `SELECT COUNT(*) AS failed_count FROM company_payments 
+                  WHERE company_id = ? AND status = 'failed' AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`,
+                [companyId]
+            );
+            
+            if (payments[0]?.failed_count >= 3) {
+                console.warn(`[Max Charge Retries Exceeded] Suspending company ${companyId}`);
+                await db.query(
+                    `UPDATE companies 
+                        SET subscription_status = 'expired'
+                      WHERE id = ?`,
+                    [companyId]
+                );
+            }
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('Error handling subscription webhook:', err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 module.exports = {
     listPayments, getPayment, recordOffline,
     createOnlineOrder, handleWebhook, listByBooking,
+    handleSubscriptionWebhook,
     _recomputeBookingPaid: recomputeBookingPaid
 };

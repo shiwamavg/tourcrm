@@ -29,6 +29,9 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
                 <a routerLink="/dashboard" routerLinkActive="active">
                     <span class="nav-icon">📊</span> <span class="nav-label">Dashboard</span>
                 </a>
+                <a routerLink="/reports" routerLinkActive="active">
+                    <span class="nav-icon">📈</span> <span class="nav-label">Analytics Reports</span>
+                </a>
 
                 <div class="group-label">Sales</div>
                 <a routerLink="/leads" routerLinkActive="active">
@@ -59,6 +62,9 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
                 <a routerLink="/suppliers" routerLinkActive="active">
                     <span class="nav-icon">🏢</span> <span class="nav-label">Suppliers</span>
                 </a>
+                <a routerLink="/gds-search" routerLinkActive="active">
+                    <span class="nav-icon">✈️</span> <span class="nav-label">GDS Search</span>
+                </a>
                 <a routerLink="/tasks" routerLinkActive="active">
                     <span class="nav-icon">✅</span> <span class="nav-label">Tasks</span>
                 </a>
@@ -87,6 +93,12 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
                 <a routerLink="/landing-pages" routerLinkActive="active">
                     <span class="nav-icon">🌐</span> <span class="nav-label">Landing Pages</span>
                 </a>
+                <a routerLink="/flyer-designer" routerLinkActive="active">
+                    <span class="nav-icon">🎨</span> <span class="nav-label">Flyer Designer</span>
+                </a>
+                <a routerLink="/b2b-marketplace" routerLinkActive="active">
+                    <span class="nav-icon">🤝</span> <span class="nav-label">B2B Network</span>
+                </a>
                 <a routerLink="/whatsapp" routerLinkActive="active">
                     <span class="nav-icon">💬</span> <span class="nav-label">WhatsApp</span>
                 </a>
@@ -114,6 +126,21 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
                     <a routerLink="/admin/usage" routerLinkActive="active">
                         <span class="nav-icon">📊</span> <span class="nav-label">Usage & Limits</span>
                     </a>
+                    <a routerLink="/admin/billing" routerLinkActive="active">
+                        <span class="nav-icon">💳</span> <span class="nav-label">Billing & Subscription</span>
+                    </a>
+                    <a routerLink="/admin/message-templates" routerLinkActive="active">
+                        <span class="nav-icon">📝</span> <span class="nav-label">Message Templates</span>
+                    </a>
+                    <a routerLink="/admin/payment-reminders" routerLinkActive="active">
+                        <span class="nav-icon">⏰</span> <span class="nav-label">Payment Reminders</span>
+                    </a>
+                    <a routerLink="/admin/followup-sequences" routerLinkActive="active">
+                        <span class="nav-icon">🔄</span> <span class="nav-label">Follow-up Sequences</span>
+                    </a>
+                    <a routerLink="/admin/gst-report" routerLinkActive="active">
+                        <span class="nav-icon">📊</span> <span class="nav-label">GST Report</span>
+                    </a>
                 }
             </nav>
             <div class="sidebar-user">
@@ -139,6 +166,10 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
                     <div class="page-title">{{ pageTitle() }}</div>
                 </div>
                 <div class="topbar-actions">
+                    <button class="theme-toggle" (click)="toggleTheme()"
+                        [attr.title]="darkMode() ? 'Switch to light mode' : 'Switch to dark mode'">
+                        {{ darkMode() ? '☀️' : '🌙' }}
+                    </button>
                     <button class="btn btn-icon" (click)="search.toggle()" title="Search (Ctrl+Shift+F)">
                         🔍
                     </button>
@@ -159,90 +190,32 @@ import { SearchModalComponent } from '../shared/components/search-modal.componen
     <app-search-modal></app-search-modal>
 `,
     styles: [`
-        .app-shell { display: flex; min-height: 100vh; }
-        .sidebar {
-            width: var(--sidebar-w); background: #0f172a; color: #e2e8f0;
-            flex-shrink: 0; display: flex; flex-direction: column;
-            position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
-            transition: transform .25s ease;
-        }
-        .sidebar-brand {
-            padding: 18px 20px; font-size: 1.15rem; font-weight: 700;
-            color: #fff; border-bottom: 1px solid #1e293b;
-            display: flex; flex-direction: column;
-        }
-        .sidebar-brand small { color: #64748b; font-weight: 400; font-size: 11px; }
+        .sidebar { transition: transform .25s ease; z-index: 100; }
         .sidebar-close { display: none; }
-        .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
-        .sidebar-nav a {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 20px; color: #cbd5e1; font-size: 14px;
-            border-left: 3px solid transparent; text-decoration: none; transition: all .15s;
-        }
-        .sidebar-nav a:hover { background: #1e293b; color: #fff; }
-        .sidebar-nav a.active { background: #1e293b; color: #fff; border-left-color: var(--primary); }
-        .sidebar-nav .group-label {
-            padding: 14px 20px 4px; font-size: 11px; text-transform: uppercase;
-            letter-spacing: .05em; color: #64748b;
-        }
         .nav-badge {
             margin-left: auto; background: var(--primary); color: #fff;
             font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
         }
-        .sidebar-user {
-            padding: 14px 20px; border-top: 1px solid #1e293b; font-size: 13px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .sidebar-user .name { color: #fff; font-weight: 600; }
-        .sidebar-user .role { color: #64748b; font-size: 11px; }
-        .sidebar-user button {
-            background: transparent; color: #94a3b8; border: none;
-            cursor: pointer; font-size: 12px;
-        }
-        .sidebar-user button:hover { color: #fff; }
 
-        .main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; }
-        .topbar {
-            height: var(--topbar-h); background: #fff; border-bottom: 1px solid var(--gray-200);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 24px; position: sticky; top: 0; z-index: 10;
-        }
-        .topbar-left { display: flex; align-items: center; gap: 14px; }
-        .menu-toggle {
-            display: none; flex-direction: column; gap: 4px;
-            background: none; border: none; cursor: pointer; padding: 4px;
-        }
-        .menu-toggle span {
-            display: block; width: 20px; height: 2px; background: #374151;
-            border-radius: 1px;
-        }
-        .topbar .page-title { font-size: 1.1rem; font-weight: 600; }
-        .topbar-actions { display: flex; gap: 10px; align-items: center; }
-        .btn-icon {
-            background: none; border: 1px solid var(--gray-200); border-radius: 6px;
-            padding: 6px 10px; cursor: pointer; font-size: 15px; color: #374151;
-            transition: all .15s;
-        }
-        .btn-icon:hover { background: var(--gray-50); border-color: var(--gray-300); }
-        .content { padding: 24px; max-width: 1400px; width: 100%; }
-
-        /* ── Mobile responsive ── */
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); z-index: 200; }
             .app-shell.mobile-open .sidebar { transform: translateX(0); }
             .sidebar-overlay {
-                position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 150;
+                position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 150;
                 animation: fadeIn .2s ease;
             }
             .sidebar-close {
-                display: block; position: absolute; top: 14px; right: 14px;
-                background: none; border: none; color: #94a3b8; font-size: 24px;
-                cursor: pointer;
+                display: flex; align-items: center; justify-content: center;
+                position: absolute; top: 12px; right: 12px;
+                background: rgba(255,255,255,0.06); border: none;
+                color: #94a3b8; font-size: 20px; width: 28px; height: 28px;
+                border-radius: 6px; cursor: pointer;
             }
+            .sidebar-close:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
             .main { margin-left: 0; }
             .menu-toggle { display: flex; }
             .topbar { padding: 0 16px; }
-            .content { padding: 16px; }
+            .content { padding: 12px; }
         }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
     `]
@@ -257,6 +230,7 @@ export class ShellComponent implements OnInit {
     pageTitle = signal('Dashboard');
     sidebarOpen = signal(false);
     leadCount = signal(0);
+    darkMode = signal(false);
 
     isAdmin = () => this.auth.user()?.role === 'admin' || this.auth.user()?.role === 'manager';
 
@@ -278,6 +252,11 @@ export class ShellComponent implements OnInit {
         '/admin/roles': 'Role Permissions',
         '/admin/settings': 'Settings',
         '/admin/usage': 'Usage & Limits',
+        '/admin/billing': 'Billing & Subscription',
+        '/admin/message-templates': 'Message Templates',
+        '/admin/payment-reminders': 'Payment Reminders',
+        '/admin/followup-sequences': 'Follow-up Sequences',
+        '/admin/gst-report': 'GST Report',
         '/suppliers': 'Suppliers',
         '/tasks': 'Tasks',
         '/itineraries': 'Itineraries',
@@ -289,9 +268,14 @@ export class ShellComponent implements OnInit {
         '/currencies': 'Currencies',
         '/landing-pages': 'Landing Pages',
         '/email-campaigns': 'Email Campaigns',
+        '/b2b-marketplace': 'B2B Network',
+        '/gds-search': 'GDS Search',
+        '/flyer-designer': 'Flyer Designer',
+        '/reports': 'Analytics Reports',
     };
 
     ngOnInit() {
+        this.initTheme();
         this.qa.setupDefaults();
         this.search.initShortcut();
 
@@ -302,6 +286,21 @@ export class ShellComponent implements OnInit {
                 this.pageTitle.set(this.resolveTitle(e.urlAfterRedirects));
                 this.sidebarOpen.set(false);
             });
+    }
+
+    private initTheme() {
+        const stored = localStorage.getItem('crm_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDark = stored ? stored === 'dark' : prefersDark;
+        this.darkMode.set(isDark);
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    }
+
+    toggleTheme() {
+        const next = !this.darkMode();
+        this.darkMode.set(next);
+        document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+        localStorage.setItem('crm_theme', next ? 'dark' : 'light');
     }
 
     private resolveTitle(url: string): string {

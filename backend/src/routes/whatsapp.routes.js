@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/whatsapp.controller');
 const { authenticate } = require('../middleware/auth');
+const { checkFeature } = require('../middleware/feature-gate');
 
-router.get('/config', authenticate, ctrl.getConfig);
-router.post('/config', authenticate, ctrl.saveConfig);
-router.post('/send', authenticate, ctrl.sendMessage);
+router.use(authenticate, checkFeature('whatsapp'));
+
+router.get('/config', ctrl.getConfig);
+router.post('/config', ctrl.saveConfig);
+router.post('/send', ctrl.sendMessage);
 
 module.exports = router;

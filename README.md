@@ -39,8 +39,8 @@ Full-stack travel-agency platform: **CRM** for staff, **customer portal**, and t
 - **Customer portal** — OTP login, my bookings, online pay (Cashfree SDK) or
   bank-transfer notify, leave review, download invoice PDF
 - **Public reviews page** — read-only testimonial list (no auth)
-- **Public quote-request form** — anonymous website form that creates a lead
-  with source=`website_form`
+- **Public demo-request form** — anonymous website form that creates a lead
+  with source=`demo_request`
 - **Settings** — agency info, bank details, Cashfree config, quotation defaults
 
 ## Project Structure
@@ -78,13 +78,15 @@ TourCRM/
 │           ├── invoices/         # list (PDF download)
 │           ├── reviews/          # list (admin reply, hide/show)
 │           └── admin/            # destinations, hotel-rates, car-rates, settings
-└── customer-website/             # Static HTML/JS/CSS customer portal
-    ├── index.html                # OTP login
+└── customer-website/             # Static HTML/JS/CSS marketing site + customer portal
+    ├── index.html                # TourCRM marketing landing page (SEO / ads)
+    ├── portal.html               # customer OTP login
     ├── dashboard.html            # my bookings + public reviews
     ├── booking-detail.html       # detail + Pay (Online / Offline tabs) + Review modals + Invoice download
-    ├── reviews.html              # public reviews
-    ├── quote.html                # public "Request a quote" form (creates lead)
+    ├── reviews.html              # public reviews + agency testimonials
+    ├── quote.html                # "Request a demo" form for agencies (creates a lead)
     ├── css/portal.css
+    ├── css/marketing.css
     └── js/api.js, auth.js
 ```
 
@@ -135,7 +137,8 @@ python -m http.server 8080
 # → http://localhost:8080
 ```
 
-Open `http://localhost:8080/index.html`, sign in with one of the demo customers:
+Open `http://localhost:8080/` for the TourCRM marketing landing page, or
+`http://localhost:8080/portal.html` to sign in with one of the demo customers:
 - `priya.thapa@outlook.com`  (has BKG-2025-0001)
 - `rajesh.sharma@gmail.com`  (has BKG-2025-0002)
 
@@ -294,10 +297,10 @@ print bank details automatically.
 | Source | How leads enter | Endpoint |
 |---|---|---|
 | **Manual** | staff uses CRM "New Lead" form | `POST /api/leads` |
-| **Website form** | anonymous visitor submits `customer-website/quote.html` | `POST /api/leads/public` |
+| **Demo request** | anonymous visitor submits `customer-website/quote.html` | `POST /api/leads/public` |
 | **CSV upload** | staff uploads a `.csv` from the lead-list page | `POST /api/leads/bulk-import` (multipart) |
 | **Meta-ads** | Facebook Lead Ads webhook to the backend | `POST /api/leads/webhook/meta-ads` (HMAC-verified) |
-| **Walk-in / phone / WhatsApp / referral / Google Sheet** | staff enters manually and picks the right `source` in the new-lead form | `POST /api/leads` |
+| **Walk-in / phone / WhatsApp / referral / Google Sheet / website form** | staff enters manually and picks the right `source` in the new-lead form | `POST /api/leads` |
 
 CSV upload expects a header row with at minimum `full_name` and `phone`. Optional
 columns: `email`, `destination_text`, `source`, `notes`, `follow_up_at`.

@@ -175,6 +175,64 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
             }
         </div>
 
+        <!-- Booking Tasks -->
+        <div class="card">
+            <h2>✅ Booking Tasks</h2>
+            @if (tasksLoading()) {
+                <span class="spinner"></span>
+            } @else if (bookingTasks().length === 0 && !showTaskForm()) {
+                <p class="text-muted">No tasks for this booking yet.</p>
+            }
+            @if (bookingTasks().length > 0) {
+                <div style="margin-bottom:12px">
+                    @for (t of bookingTasks(); track t.id) {
+                        <div class="task-row" [class.completed]="t.is_completed">
+                            <label class="task-checkbox">
+                                <input type="checkbox" [checked]="t.is_completed"
+                                    (change)="toggleTask(t)" />
+                                <span class="checkmark"></span>
+                            </label>
+                            <div class="task-body">
+                                <span class="task-title">{{ t.title }}</span>
+                                @if (t.assigned_to_name) {
+                                    <span class="task-assignee">👤 {{ t.assigned_to_name }}</span>
+                                }
+                                @if (t.due_date) {
+                                    <span class="task-due">📅 {{ t.due_date | date:'mediumDate' }}</span>
+                                }
+                            </div>
+                            <button class="btn btn-sm btn-danger-outline" (click)="deleteTask(t.id)"
+                                title="Delete task">×</button>
+                        </div>
+                    }
+                </div>
+            }
+            @if (showTaskForm()) {
+                <div class="task-form">
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <input type="text" [(ngModel)]="newTaskTitle" placeholder="Task title…" />
+                        </div>
+                        <div class="form-group">
+                            <input type="text" [(ngModel)]="newTaskAssignee" placeholder="Assignee name (optional)" />
+                        </div>
+                        <div class="form-group">
+                            <input type="date" [(ngModel)]="newTaskDueDate" />
+                        </div>
+                    </div>
+                    <div class="flex">
+                        <button class="btn btn-primary btn-sm" (click)="addTask()"
+                            [disabled]="taskSaving() || !newTaskTitle.trim()">
+                            {{ taskSaving() ? 'Adding…' : '✓ Add' }}
+                        </button>
+                        <button class="btn btn-sm btn-outline" (click)="closeTaskForm()">Cancel</button>
+                    </div>
+                </div>
+            } @else {
+                <button class="btn btn-sm btn-outline" (click)="openTaskForm()">+ Add Task</button>
+            }
+        </div>
+
         <!-- Invoices -->
         @if (booking()!.invoices?.length) {
             <div class="card">
@@ -286,7 +344,24 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
             </div>
         }
     }
-    `
+    `,
+    styles: [`
+        .task-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--gray-100); transition:background .1s; }
+        .task-row:hover { background:var(--gray-50); }
+        .task-row.completed { opacity:.6; }
+        .task-row.completed .task-title { text-decoration:line-through; }
+        .task-checkbox { position:relative; width:20px; height:20px; flex-shrink:0; }
+        .task-checkbox input { position:absolute; opacity:0; cursor:pointer; width:100%; height:100%; z-index:1; }
+        .task-checkbox .checkmark { display:block; width:20px; height:20px; border:2px solid var(--gray-300); border-radius:4px; background:#fff; transition:all .15s; }
+        .task-checkbox input:checked ~ .checkmark { background:var(--success); border-color:var(--success); }
+        .task-checkbox input:checked ~ .checkmark::after { content:'✓'; display:block; text-align:center; color:#fff; font-size:14px; line-height:16px; }
+        .task-body { flex:1; display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; }
+        .task-title { font-weight:500; }
+        .task-assignee, .task-due { font-size:12px; color:#64748b; }
+        .btn-danger-outline { background:transparent; border:1px solid var(--danger); color:var(--danger); width:26px; height:26px; border-radius:4px; cursor:pointer; font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center; }
+        .btn-danger-outline:hover { background:var(--danger); color:#fff; }
+        .task-form { margin-top:6px; padding:8px; background:var(--gray-50); border-radius:8px; }
+    `]
 })
 export class BookingDetailComponent implements OnInit {
     private api  = inject(ApiService);
@@ -308,6 +383,15 @@ export class BookingDetailComponent implements OnInit {
         offline_note: ''
     };
 
+    // Booking tasks
+    bookingTasks = signal<any[]>([]);
+    tasksLoading = signal(false);
+    showTaskForm = signal(false);
+    taskSaving = signal(false);
+    newTaskTitle = '';
+    newTaskAssignee = '';
+    newTaskDueDate = '';
+
     balance = computed(() => {
         const b = this.booking();
         if (!b) return 0;
@@ -320,8 +404,61 @@ export class BookingDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) { this.loading.set(false); return; }
         this.api.getBooking(id).subscribe({
-            next: b => { this.booking.set(b); this.loading.set(false); },
+            next: b => { this.booking.set(b); this.loading.set(false); this.loadTasks(); },
             error: ()  => this.loading.set(false)
+        });
+    }
+
+    loadTasks() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id) return;
+        this.tasksLoading.set(true);
+        this.api.listBookingTasks(id).subscribe({
+            next: tasks => { this.bookingTasks.set(tasks); this.tasksLoading.set(false); },
+            error: () => this.tasksLoading.set(false)
+        });
+    }
+
+    openTaskForm() {
+        this.newTaskTitle = '';
+        this.newTaskAssignee = '';
+        this.newTaskDueDate = '';
+        this.showTaskForm.set(true);
+    }
+
+    closeTaskForm() { this.showTaskForm.set(false); }
+
+    addTask() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id || !this.newTaskTitle.trim()) return;
+        this.taskSaving.set(true);
+        this.api.createBookingTask({
+            booking_id: Number(id),
+            title: this.newTaskTitle.trim(),
+            assigned_to_name: this.newTaskAssignee.trim() || undefined,
+            due_date: this.newTaskDueDate || undefined
+        }).subscribe({
+            next: () => {
+                this.taskSaving.set(false);
+                this.showTaskForm.set(false);
+                this.loadTasks();
+            },
+            error: () => this.taskSaving.set(false)
+        });
+    }
+
+    toggleTask(task: any) {
+        this.api.toggleBookingTask(task.id).subscribe({
+            next: () => this.loadTasks(),
+            error: () => {}
+        });
+    }
+
+    deleteTask(taskId: number) {
+        if (!confirm('Delete this task?')) return;
+        this.api.deleteBookingTask(taskId).subscribe({
+            next: () => this.loadTasks(),
+            error: () => {}
         });
     }
 

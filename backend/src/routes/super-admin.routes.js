@@ -39,4 +39,8 @@ router.get('/invoices/:id/download', c.downloadCompanyInvoice);
 // Reports
 router.get('/reports/revenue', c.revenueReport);
 
+// Logs
+router.get('/login-logs', c.listLoginLogs);
+router.get('/activity-logs', c.listActivityLogs);
+
 module.exports = router;

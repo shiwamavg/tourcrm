@@ -691,6 +691,72 @@ const revenueReport = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ── Login Logs (agency staff logins) ─────────────────────────
+const listLoginLogs = async (req, res, next) => {
+    try {
+        const { company_id, status, email, page = 1, limit = 50 } = req.query;
+        const where = [];
+        const params = [];
+        if (company_id) { where.push('sll.company_id = ?'); params.push(company_id); }
+        if (status) { where.push('sll.status = ?'); params.push(status); }
+        if (email) { where.push('sll.email LIKE ?'); params.push(`%${email}%`); }
+        const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+        const lim = Math.max(1, Math.min(100, Number(limit)));
+        const offset = (Math.max(1, Number(page)) - 1) * lim;
+
+        const [rows] = await db.query(
+            `SELECT sll.*, c.name AS company_name, su.full_name AS user_name
+               FROM staff_login_logs sll
+               LEFT JOIN companies c ON c.id = sll.company_id
+               LEFT JOIN staff_users su ON su.id = sll.user_id
+               ${whereSql}
+           ORDER BY sll.created_at DESC
+              LIMIT ? OFFSET ?`,
+            [...params, lim, offset]
+        );
+        const [count] = await db.query(
+            `SELECT COUNT(*) AS total FROM staff_login_logs sll ${whereSql}`, params
+        );
+        res.json({ items: rows, login_logs: rows, total: count[0].total, page: Number(page), limit: lim });
+    } catch (err) { next(err); }
+};
+
+// ── Activity Logs (audit_log with company filter) ────────────
+const listActivityLogs = async (req, res, next) => {
+    try {
+        const { company_id, action, entity_type, user_id, page = 1, limit = 50 } = req.query;
+        const where = [];
+        const params = [];
+        if (company_id) { where.push('al.company_id = ?'); params.push(company_id); }
+        if (action) { where.push('al.action = ?'); params.push(action); }
+        if (entity_type) { where.push('al.entity_type = ?'); params.push(entity_type); }
+        if (user_id) { where.push('al.user_id = ?'); params.push(user_id); }
+        const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+        const lim = Math.max(1, Math.min(100, Number(limit)));
+        const offset = (Math.max(1, Number(page)) - 1) * lim;
+
+        const [rows] = await db.query(
+            `SELECT al.*, c.name AS company_name, su.full_name AS user_name
+               FROM audit_log al
+               LEFT JOIN companies c ON c.id = al.company_id
+               LEFT JOIN staff_users su ON su.id = al.user_id
+               ${whereSql}
+           ORDER BY al.created_at DESC
+              LIMIT ? OFFSET ?`,
+            [...params, lim, offset]
+        );
+        const [count] = await db.query(
+            `SELECT COUNT(*) AS total FROM audit_log al ${whereSql}`, params
+        );
+        const items = rows.map(r => {
+            try { r.old_data = typeof r.old_data === 'string' ? JSON.parse(r.old_data) : r.old_data; } catch { r.old_data = null; }
+            try { r.new_data = typeof r.new_data === 'string' ? JSON.parse(r.new_data) : r.new_data; } catch { r.new_data = null; }
+            return r;
+        });
+        res.json({ items, activity_logs: items, total: count[0].total, page: Number(page), limit: lim });
+    } catch (err) { next(err); }
+};
+
 module.exports = {
     login,
     dashboardStats,
@@ -698,5 +764,7 @@ module.exports = {
     listPackages, createPackage, updatePackage,
     listCompanyPayments, createCompanyPayment, downloadCompanyPaymentInvoice,
     listCompanyInvoices, createCompanyInvoice, updateCompanyInvoice, downloadCompanyInvoice,
-    revenueReport
+    revenueReport,
+    listLoginLogs,
+    listActivityLogs
 };

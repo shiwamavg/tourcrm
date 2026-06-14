@@ -84,4 +84,24 @@ export class SuperAdminApiService {
         if (year) p = p.set('year', String(year));
         return this.http.get<any[]>(`${this.base}/reports/revenue`, { params: p });
     }
+
+    getMonitorMetrics(): Observable<any> {
+        return this.http.get('http://localhost:3000/api/monitor/metrics');
+    }
+
+    listLoginLogs(params: { company_id?: number; status?: string; email?: string; page?: number; limit?: number } = {}): Observable<any> {
+        let p = new HttpParams();
+        for (const [k, v] of Object.entries(params)) {
+            if (v !== undefined && v !== null && v !== '') p = p.set(k, String(v));
+        }
+        return this.http.get(`${this.base}/login-logs`, { params: p });
+    }
+
+    listActivityLogs(params: { company_id?: number; action?: string; entity_type?: string; user_id?: number; page?: number; limit?: number } = {}): Observable<any> {
+        let p = new HttpParams();
+        for (const [k, v] of Object.entries(params)) {
+            if (v !== undefined && v !== null && v !== '') p = p.set(k, String(v));
+        }
+        return this.http.get(`${this.base}/activity-logs`, { params: p });
+    }
 }

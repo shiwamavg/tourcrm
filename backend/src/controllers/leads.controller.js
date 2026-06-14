@@ -9,7 +9,7 @@ const db        = require('../config/db');
 // ── helpers ──────────────────────────────────────────────────
 const VALID_SOURCES = new Set([
     'manual', 'website_form', 'google_sheet', 'csv_upload',
-    'meta_ads', 'walk_in', 'referral', 'whatsapp', 'phone', 'other'
+    'meta_ads', 'walk_in', 'referral', 'whatsapp', 'phone', 'other', 'demo_request'
 ]);
 
 const VALID_STATUSES = new Set([
@@ -169,6 +169,12 @@ const createLead = async (req, res, next) => {
             });
         } catch (e) {
             console.error('Failed to log system milestone for lead creation:', e.message);
+        }
+        try {
+            const { startSequenceForLead } = require('./followup-sequence.controller');
+            await startSequenceForLead(created[0]);
+        } catch (e) {
+            console.error('Failed to start follow-up sequence for lead:', e.message);
         }
         res.status(201).json(created[0]);
     } catch (err) { next(err); }
@@ -484,15 +490,19 @@ const publicCreate = async (req, res) => {
         notes       ? sanitize(notes) : ''
     ].filter(Boolean).join(' · ');
 
+    const source = VALID_SOURCES.has(req.body?.source) ? req.body.source : 'website_form';
+    const sourceLabel = source === 'demo_request' ? 'Demo Request' : 'Website Form';
+
     try {
         const [ins] = await db.query(
             `INSERT INTO leads
                 (full_name, email, phone, destination_text, source, status, notes, source_meta, company_id)
-             VALUES (?,?,?,?, 'website_form', 'new', ?, ?, ?)`,
+             VALUES (?,?,?,?, ?, 'new', ?, ?, ?)`,
             [sanitize(full_name),
              sanitize(email) || null,
              sanitize(phone),
              sanitize(destination_text),
+             source,
              composedNotes || null,
              JSON.stringify({
                  ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
@@ -507,12 +517,20 @@ const publicCreate = async (req, res) => {
                 company_id: targetCompanyId,
                 lead_id: ins.insertId,
                 user_id: 1, // System admin
-                notes: `Lead created via Website Form.`,
+                notes: `Lead created via ${sourceLabel}.`,
                 is_system: 1
             });
         } catch (e) {
             console.error('Failed to log system milestone for public website lead:', e.message);
         }
+        const [created] = await db.query('SELECT * FROM leads WHERE id = ?', [ins.insertId]);
+        try {
+            const { startSequenceForLead } = require('./followup-sequence.controller');
+            await startSequenceForLead(created[0]);
+        } catch (e) {
+            console.error('Failed to start follow-up sequence for public lead:', e.message);
+        }
+
         res.status(201).json({
             ok: true,
             lead_id: ins.insertId,

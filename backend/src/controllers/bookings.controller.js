@@ -112,4 +112,108 @@ const updateStatus = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-module.exports = { listBookings, getBooking, updateStatus };
+const generateBookingNumber = async (conn, companyId) => {
+    const year = new Date().getFullYear();
+    const [rows] = await conn.query(
+        'SELECT COUNT(*) AS c FROM bookings WHERE YEAR(created_at) = ? AND company_id = ?',
+        [year, companyId]
+    );
+    const seq = String(Number(rows[0].c || 0) + 1).padStart(4, '0');
+    return `BKG-${year}-${seq}`;
+};
+
+const createBooking = async (req, res, next) => {
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        const { quotation_id, booking_fee_pct, special_requests, internal_notes } = req.body || {};
+
+        if (!quotation_id) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'quotation_id is required' });
+        }
+
+        const [qResult] = await conn.query(
+            `SELECT * FROM quotations WHERE id = ? AND company_id = ?`,
+            [quotation_id, req.companyId]
+        );
+        if (!qResult.length) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Quotation not found' });
+        }
+        const q = qResult[0];
+
+        const bookingNumber = await generateBookingNumber(conn, req.companyId);
+        const feePct = booking_fee_pct || 20;
+        const feeAmount = (q.grand_total * feePct / 100);
+
+        const [bResult] = await conn.query(`
+            INSERT INTO bookings (
+                booking_number, quotation_id, customer_name, customer_phone, customer_email,
+                destination_text, trip_start_date, trip_end_date, adults,
+                children_below_5, children_above_5, total_amount,
+                booking_fee_pct, booking_fee_amount, amount_paid, status, payment_status,
+                special_requests, internal_notes, created_by, company_id
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending','pending',?,?,?,?)
+        `, [
+            bookingNumber, quotation_id, q.customer_name, q.customer_phone, q.customer_email || null,
+            q.destination_text, q.trip_start_date, q.trip_end_date, q.adults,
+            q.children_below_5, q.children_above_5, q.grand_total,
+            feePct, feeAmount, special_requests || null, internal_notes || null, req.user.id, req.companyId
+        ]);
+
+        const bookingId = bResult.insertId;
+
+        await conn.query(
+            `UPDATE quotations SET status = 'accepted' WHERE id = ? AND company_id = ?`,
+            [quotation_id, req.companyId]
+        );
+
+        if (q.lead_id) {
+            await conn.query(
+                `UPDATE leads SET status = 'converted' WHERE id = ? AND company_id = ?`,
+                [q.lead_id, req.companyId]
+            );
+        }
+
+        try {
+            const { logFollowup } = require('../services/followup.service');
+            await logFollowup(conn, {
+                company_id: req.companyId,
+                lead_id: q.lead_id || null,
+                quotation_id,
+                booking_id: bookingId,
+                user_id: req.user.id,
+                notes: `Booking ${bookingNumber} created from Quotation ${q.quotation_number}.`,
+                is_system: 1
+            });
+        } catch (e) {
+            console.error('Failed to log system milestone for booking creation:', e.message);
+        }
+
+        // Create default operational tasks for this booking
+        try {
+            const { createTasksForBooking } = require('./booking-task.controller');
+            await createTasksForBooking({
+                id: bookingId,
+                company_id: req.companyId,
+                trip_start_date: q.trip_start_date
+            });
+        } catch (e) {
+            console.error('Failed to create default booking tasks:', e.message);
+        }
+
+        await conn.commit();
+
+        const [rows] = await db.query('SELECT * FROM bookings WHERE id = ? AND company_id = ?', [bookingId, req.companyId]);
+        res.status(201).json(rows[0]);
+    } catch (err) {
+        try { await conn.rollback(); } catch {}
+        next(err);
+    } finally {
+        conn.release();
+    }
+};
+
+module.exports = { listBookings, getBooking, updateStatus, createBooking };

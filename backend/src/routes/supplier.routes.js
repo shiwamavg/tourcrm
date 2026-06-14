@@ -2,10 +2,13 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/supplier.controller');
 const { authenticate } = require('../middleware/auth');
+const { checkFeature } = require('../middleware/feature-gate');
 
-router.get('/', authenticate, ctrl.list);
-router.post('/', authenticate, ctrl.create);
-router.patch('/:id', authenticate, ctrl.update);
-router.delete('/:id', authenticate, ctrl.remove);
+router.use(authenticate, checkFeature('supplier'));
+
+router.get('/', ctrl.list);
+router.post('/', ctrl.create);
+router.patch('/:id', ctrl.update);
+router.delete('/:id', ctrl.remove);
 
 module.exports = router;

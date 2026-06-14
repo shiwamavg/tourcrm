@@ -419,7 +419,7 @@ export interface ReviewListResponse {
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost' | 'junk';
 export type LeadSource =
     | 'manual' | 'website_form' | 'google_sheet' | 'csv_upload'
-    | 'meta_ads' | 'walk_in' | 'referral' | 'whatsapp' | 'phone' | 'other';
+    | 'meta_ads' | 'walk_in' | 'referral' | 'whatsapp' | 'phone' | 'other' | 'demo_request';
 
 export interface Lead {
     id: number;

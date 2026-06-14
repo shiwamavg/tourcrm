@@ -33,6 +33,18 @@ app.post('/api/payments/cashfree/webhook',
     paymentsCtl.handleWebhook
 );
 
+app.post('/api/payments/cashfree/subscription-webhook',
+    express.raw({ type: '*/*', limit: '1mb' }),
+    (req, _res, next) => {
+        try { req.rawBody = req.body; } catch {}
+        if (Buffer.isBuffer(req.body)) {
+            try { req.body = JSON.parse(req.body.toString('utf8') || '{}'); } catch {}
+        }
+        next();
+    },
+    paymentsCtl.handleSubscriptionWebhook
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -48,11 +60,15 @@ app.use('/api/monitor', require('./routes/monitor.routes'));
 app.use(extractCompany);
 app.use(checkCompanyStatus);
 
+const rateLimiter = require('./middleware/rate-limiter');
+app.use(rateLimiter);
+
 // Public SaaS routes
 app.use('/api/subscription-packages', require('./routes/subscription.routes'));
 
 // CRM Routes
 app.use('/api/auth',       require('./routes/auth.routes'));
+app.use('/api/billing',    require('./routes/tenant-billing.routes'));
 app.use('/api/quotations', require('./routes/quotations.routes'));
 app.use('/api/admin',      require('./routes/admin.routes'));
 app.use('/api/admin/bookings', require('./routes/bookings.routes'));
@@ -76,6 +92,17 @@ app.use('/api/landing-pages', require('./routes/landing-page.routes'));
 app.use('/api/usage',        require('./routes/usage.routes'));
 app.use('/api/daywise-itinerary', require('./routes/daywise-itinerary.routes'));
 app.use('/api/followups',         require('./routes/followup.routes'));
+app.use('/api/message-templates', require('./routes/message-template.routes'));
+app.use('/api/payment-reminders', require('./routes/payment-reminder.routes'));
+app.use('/api/followup-sequences', require('./routes/followup-sequence.routes'));
+app.use('/api/booking-tasks',     require('./routes/booking-task.routes'));
+
+// Competitor features
+app.use('/api/b2b',               require('./routes/b2b.routes'));
+app.use('/api/gds',               require('./routes/gds.routes'));
+app.use('/api/flyers',            require('./routes/flyer.routes'));
+app.use('/api/reports',           require('./routes/report.routes'));
+app.use('/api/reports/gst',       require('./routes/gst-report.routes'));
 
 app.use(notFound);
 app.use(errorHandler);

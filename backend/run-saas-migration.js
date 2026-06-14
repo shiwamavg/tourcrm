@@ -52,6 +52,9 @@ async function run() {
                 max_leads INT UNSIGNED NOT NULL DEFAULT 1000,
                 max_quotations INT UNSIGNED NOT NULL DEFAULT 500,
                 max_bookings INT UNSIGNED NOT NULL DEFAULT 200,
+                max_invoices INT UNSIGNED NOT NULL DEFAULT 200,
+                max_visas INT UNSIGNED NOT NULL DEFAULT 50,
+                max_campaigns INT UNSIGNED NOT NULL DEFAULT 10,
                 features JSON,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -75,6 +78,18 @@ async function run() {
             await db.query('ALTER TABLE companies ADD COLUMN email_verified_at DATETIME NULL AFTER subscription_start_date');
             console.log('Added companies.email_verified_at');
         }
+        if (!await columnExists('companies', 'max_invoices')) {
+            await db.query('ALTER TABLE companies ADD COLUMN max_invoices INT UNSIGNED NOT NULL DEFAULT 200 AFTER max_bookings');
+            console.log('Added companies.max_invoices');
+        }
+        if (!await columnExists('companies', 'max_visas')) {
+            await db.query('ALTER TABLE companies ADD COLUMN max_visas INT UNSIGNED NOT NULL DEFAULT 50 AFTER max_invoices');
+            console.log('Added companies.max_visas');
+        }
+        if (!await columnExists('companies', 'max_campaigns')) {
+            await db.query('ALTER TABLE companies ADD COLUMN max_campaigns INT UNSIGNED NOT NULL DEFAULT 10 AFTER max_visas');
+            console.log('Added companies.max_campaigns');
+        }
     }
 
     // 2. Create subscription_packages
@@ -91,6 +106,9 @@ async function run() {
                 max_leads INT UNSIGNED NOT NULL DEFAULT 1000,
                 max_quotations INT UNSIGNED NOT NULL DEFAULT 500,
                 max_bookings INT UNSIGNED NOT NULL DEFAULT 200,
+                max_invoices INT UNSIGNED NOT NULL DEFAULT 200,
+                max_visas INT UNSIGNED NOT NULL DEFAULT 50,
+                max_campaigns INT UNSIGNED NOT NULL DEFAULT 10,
                 features JSON,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 sort_order INT NOT NULL DEFAULT 0,
@@ -99,6 +117,21 @@ async function run() {
             ) ENGINE=InnoDB
         `);
         console.log('Created: subscription_packages');
+    }
+
+    if (await tableExists('subscription_packages')) {
+        if (!await columnExists('subscription_packages', 'max_invoices')) {
+            await db.query('ALTER TABLE subscription_packages ADD COLUMN max_invoices INT UNSIGNED NOT NULL DEFAULT 200 AFTER max_bookings');
+            console.log('Added subscription_packages.max_invoices');
+        }
+        if (!await columnExists('subscription_packages', 'max_visas')) {
+            await db.query('ALTER TABLE subscription_packages ADD COLUMN max_visas INT UNSIGNED NOT NULL DEFAULT 50 AFTER max_invoices');
+            console.log('Added subscription_packages.max_visas');
+        }
+        if (!await columnExists('subscription_packages', 'max_campaigns')) {
+            await db.query('ALTER TABLE subscription_packages ADD COLUMN max_campaigns INT UNSIGNED NOT NULL DEFAULT 10 AFTER max_visas');
+            console.log('Added subscription_packages.max_campaigns');
+        }
     }
 
     // 3. Create company_subscriptions
@@ -220,14 +253,21 @@ async function run() {
     const [[pkg]] = await db.query('SELECT id FROM subscription_packages LIMIT 1');
     if (!pkg) {
         await db.query(`
-            INSERT INTO subscription_packages (name, slug, description, price_monthly, price_yearly, max_users, max_leads, max_quotations, max_bookings, features, sort_order)
+            INSERT INTO subscription_packages (name, slug, description, price_monthly, price_yearly, max_users, max_leads, max_quotations, max_bookings, max_invoices, max_visas, max_campaigns, features, sort_order)
             VALUES
-            ('Starter', 'starter', 'Perfect for small travel agencies just getting started.', 2999, 29990, 3, 500, 200, 50, JSON_ARRAY('leads','quotations','bookings','dashboard','destinations','rates'), 1),
-            ('Professional', 'professional', 'For growing agencies with team and regular bookings.', 5999, 59990, 10, 3000, 1000, 300, JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard'), 2),
-            ('Enterprise', 'enterprise', 'Full-featured solution for large agencies and DMCs.', 11999, 119990, 50, 20000, 5000, 2000, JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard','whatsapp','supplier','b2b','website'), 3)
+            ('Starter', 'starter', 'Perfect for small travel agencies just getting started.', 2999, 29990, 3, 500, 200, 50, 50, 10, 2, JSON_ARRAY('leads','quotations','bookings','dashboard','destinations','rates'), 1),
+            ('Professional', 'professional', 'For growing agencies with team and regular bookings.', 5999, 59990, 10, 3000, 1000, 300, 300, 100, 10, JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard'), 2),
+            ('Enterprise', 'enterprise', 'Full-featured solution for large agencies and DMCs.', 11999, 119990, 50, 20000, 5000, 2000, 2000, 500, 50, JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard','whatsapp','supplier','b2b','website'), 3)
         `);
         console.log('Seeded subscription packages');
     }
+
+    // Always sync package and company limits to include the new resources
+    await db.query("UPDATE subscription_packages SET max_invoices=50, max_visas=10, max_campaigns=2, features = JSON_ARRAY('leads','quotations','bookings','dashboard','destinations','rates') WHERE slug='starter'");
+    await db.query("UPDATE subscription_packages SET max_invoices=300, max_visas=100, max_campaigns=10, features = JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard') WHERE slug='professional'");
+    await db.query("UPDATE subscription_packages SET max_invoices=2000, max_visas=500, max_campaigns=50, features = JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard','whatsapp','supplier','b2b','website','campaigns') WHERE slug='enterprise'");
+    await db.query("UPDATE companies SET max_invoices=300, max_visas=100, max_campaigns=10, features = JSON_ARRAY('leads','quotations','bookings','payments','invoices','reviews','users','settings','destinations','rates','reports','dashboard') WHERE id=1");
+    console.log('Synchronized max_invoices, max_visas, max_campaigns and features values for existing records.');
 
     // 10. Seed super admin
     const [[sa]] = await db.query('SELECT id FROM super_admins LIMIT 1');
@@ -245,6 +285,34 @@ async function run() {
         await db.query(`UPDATE ${table} SET company_id = 1 WHERE company_id = 0 OR company_id IS NULL`);
     }
     console.log('Updated existing data to company_id = 1');
+
+    // 12. Add competitor feature updates (B2B and Flyers)
+    if (await tableExists('fixed_departures')) {
+        if (!await columnExists('fixed_departures', 'is_b2b_shared')) {
+            await db.query('ALTER TABLE fixed_departures ADD COLUMN is_b2b_shared TINYINT(1) DEFAULT 0');
+            console.log('Added fixed_departures.is_b2b_shared');
+        }
+    }
+    if (await tableExists('itineraries')) {
+        if (!await columnExists('itineraries', 'is_b2b_shared')) {
+            await db.query('ALTER TABLE itineraries ADD COLUMN is_b2b_shared TINYINT(1) DEFAULT 0');
+            console.log('Added itineraries.is_b2b_shared');
+        }
+    }
+    if (!await tableExists('flyers')) {
+        await db.query(`
+            CREATE TABLE flyers (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                company_id INT UNSIGNED NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                layout_data JSON,
+                package_id INT UNSIGNED,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+        `);
+        console.log('Created: flyers');
+    }
 
     console.log('=== Migration Complete ===');
     process.exit(0);

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Portal — TourCRM</title>
+    <meta name="description" content="Sign in to your TourCRM customer portal to view bookings, make payments, download invoices, and leave reviews.">
+    <link rel="stylesheet" href="css/portal.css">
+    <link rel="stylesheet" href="css/marketing.css">
+    <script>
+        window.API_BASE = 'http://localhost:3000';
+    </script>
+    <style>
+        .portal-nav { background: #fff; border-bottom: 1px solid var(--gray-200); }
+        .portal-nav .container { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+        .portal-nav .brand { color: var(--gray-900); }
+        .portal-nav nav a { color: var(--gray-700); font-size: 14px; margin-left: 18px; }
+        .portal-wrap { max-width: 420px; margin: 60px auto; }
+        .portal-box { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 28px; box-shadow: var(--shadow-lg); }
+    </style>
+</head>
+<body>
+
+<header class="portal-nav">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <span class="logo">🏔️</span>
+            <span>TourCRM</span>
+        </a>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="quote.html">Request Demo</a>
+            <a href="reviews.html">Reviews</a>
+        </nav>
+    </div>
+</header>
+
+<main class="portal-wrap">
+    <div class="portal-box">
+        <h1>🔐 Customer Sign in</h1>
+        <p class="hero">Enter the email you used when booking. We'll send you a one-time code.</p>
+
+        <div data-alert></div>
+
+        <form id="stepEmail">
+            <div class="form-group">
+                <label for="email">Email <span class="req">*</span></label>
+                <input id="email" type="email" required placeholder="you@example.com" autocomplete="email">
+            </div>
+            <button class="btn btn-primary btn-block" id="sendBtn" type="submit">
+                📧 Send OTP
+            </button>
+        </form>
+
+        <form id="stepOtp" style="display:none">
+            <p>We sent a 6-digit code to <strong id="sentTo"></strong>.</p>
+            <div class="form-group">
+                <label for="code">One-time code <span class="req">*</span></label>
+                <input id="code" type="text" inputmode="numeric" pattern="\d{6}" maxlength="6" required placeholder="123456" autocomplete="one-time-code" style="letter-spacing:8px;text-align:center;font-size:20px">
+            </div>
+            <button class="btn btn-primary btn-block" id="verifyBtn" type="submit">
+                ✓ Verify &amp; Sign in
+            </button>
+            <p class="muted" style="text-align:center;margin-top:12px">
+                <a href="#" id="resendLink">Resend code</a> · <a href="#" id="changeEmailLink">Use a different email</a>
+            </p>
+        </form>
+
+        <div class="dev-otp" id="devOtp" style="display:none">
+            <div><strong>Demo mode:</strong> emails are logged to the backend console.</div>
+            <div style="margin-top:4px">Your code: <strong id="devOtpValue">—</strong></div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:18px 0">
+        <p class="muted" style="font-size:13px">
+            New customer? You don't need to register here — your booking was created
+            when your travel consultant sent you a quote. Sign in with the email
+            they used and you'll see your trip.
+        </p>
+    </div>
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>TourCRM</h4>
+                <p>CRM software for tour & travel agencies</p>
+                <p>✉ support@tourcrm.example.com</p>
+            </div>
+            <div>
+                <h4>Quick links</h4>
+                <p><a href="index.html">Home</a></p>
+                <p><a href="quote.html">Request demo</a></p>
+                <p><a href="reviews.html">Reviews</a></p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> TourCRM. All rights reserved.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    if (Auth.token) {
+        const ret = getQueryParam('return') || 'dashboard.html';
+        location.replace(ret);
+    }
+
+    const $ = (id) => document.getElementById(id);
+    const stepEmail = $('stepEmail');
+    const stepOtp   = $('stepOtp');
+    const devOtp    = $('devOtp');
+    const sentTo    = $('sentTo');
+    const devOtpVal = $('devOtpValue');
+    let currentEmail = '';
+
+    stepEmail.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        currentEmail = $('email').value.trim();
+        if (!currentEmail) return;
+        const btn = $('sendBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Sending…';
+        try {
+            const r = await API.sendOtp(currentEmail);
+            sentTo.textContent = currentEmail;
+            if (r.dev_otp) {
+                devOtpVal.textContent = r.dev_otp;
+                devOtp.style.display = 'block';
+                $('code').value = r.dev_otp;
+            } else {
+                devOtp.style.display = 'none';
+            }
+            stepEmail.style.display = 'none';
+            stepOtp.style.display   = 'block';
+            $('code').focus();
+            showAlert('success', 'OTP sent. Check your inbox (or the demo box below).');
+        } catch (err) {
+            showAlert('error', err.message || 'Failed to send OTP');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '📧 Send OTP';
+        }
+    });
+
+    stepOtp.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const code = $('code').value.trim();
+        if (!code || code.length < 4) {
+            showAlert('error', 'Please enter the code we sent you.');
+            return;
+        }
+        const btn = $('verifyBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Verifying…';
+        try {
+            const r = await API.verifyOtp(currentEmail, code);
+            Auth.session(r.access_token, r.email);
+            const ret = getQueryParam('return') || 'dashboard.html';
+            location.replace(ret);
+        } catch (err) {
+            showAlert('error',
+                err.payload?.error === 'wrong_code'    ? 'Wrong code. Please try again.' :
+                err.payload?.error === 'expired'       ? 'Code expired. Please resend.' :
+                err.payload?.error === 'too_many_attempts' ? 'Too many attempts. Please resend.' :
+                err.message || 'Verification failed');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '✓ Verify &amp; Sign in';
+        }
+    });
+
+    $('resendLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+            const r = await API.sendOtp(currentEmail);
+            if (r.dev_otp) { devOtpVal.textContent = r.dev_otp; $('code').value = r.dev_otp; }
+            showAlert('success', 'New code sent.');
+        } catch (err) { showAlert('error', err.message); }
+    });
+    $('changeEmailLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        stepOtp.style.display = 'none';
+        devOtp.style.display  = 'none';
+        stepEmail.style.display = 'block';
+        $('email').value = currentEmail;
+        $('email').focus();
+    });
+</script>
+
+</body>
+</html>

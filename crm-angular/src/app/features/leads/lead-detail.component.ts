@@ -180,6 +180,7 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
         .src-meta_ads    { background:#fef3c7; color:#92400e; }
         .src-walk_in     { background:#dbeafe; color:#1e40af; }
         .src-website_form{ background:#e0e7ff; color:#3730a3; }
+        .src-demo_request{ background:#ccfbf1; color:#0f766e; }
         .src-csv_upload  { background:#fae8ff; color:#6b21a8; }
         .src-referral    { background:#d1fae5; color:#065f46; }
         .src-whatsapp    { background:#d1fae5; color:#065f46; }
@@ -326,9 +327,10 @@ export class LeadDetailComponent implements OnInit {
 
     sourceLabel(s: string): string {
         const map: Record<string, string> = {
-            manual: 'Manual', website_form: 'Website form', google_sheet: 'Google Sheet',
-            csv_upload: 'CSV upload', meta_ads: 'Meta Ads', walk_in: 'Walk-in',
-            referral: 'Referral', whatsapp: 'WhatsApp', phone: 'Phone', other: 'Other'
+            manual: 'Manual', website_form: 'Website form', demo_request: 'Demo request',
+            google_sheet: 'Google Sheet', csv_upload: 'CSV upload', meta_ads: 'Meta Ads',
+            walk_in: 'Walk-in', referral: 'Referral', whatsapp: 'WhatsApp', phone: 'Phone',
+            other: 'Other'
         };
         return map[s] || s;
     }

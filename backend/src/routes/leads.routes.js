@@ -19,6 +19,7 @@ const router  = require('express').Router();
 const multer = require('multer');
 const c = require('../controllers/leads.controller');
 const { authenticate } = require('../middleware/auth');
+const { checkQuota } = require('../middleware/quota');
 
 const upload = multer({
     storage: multer.memoryStorage(),

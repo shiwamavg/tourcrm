@@ -109,6 +109,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/admin/settings.component').then(m => m.SettingsComponent)
             },
             {
+                path: 'admin/billing',
+                loadComponent: () => import('./features/admin/billing/billing.component').then(m => m.BillingComponent)
+            },
+            {
                 path: 'suppliers',
                 loadComponent: () => import('./features/competitor/supplier-list.component').then(m => m.SupplierListComponent)
             },
@@ -157,8 +161,40 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/competitor/email-campaign-list.component').then(m => m.EmailCampaignListComponent)
             },
             {
+                path: 'b2b-marketplace',
+                loadComponent: () => import('./features/competitor/b2b-marketplace.component').then(m => m.B2BMarketplaceComponent)
+            },
+            {
+                path: 'gds-search',
+                loadComponent: () => import('./features/competitor/gds-search.component').then(m => m.GDSSearchComponent)
+            },
+            {
+                path: 'flyer-designer',
+                loadComponent: () => import('./features/competitor/flyer-designer.component').then(m => m.FlyerDesignerComponent)
+            },
+            {
+                path: 'reports',
+                loadComponent: () => import('./features/competitor/reports.component').then(m => m.ReportsComponent)
+            },
+            {
                 path: 'admin/usage',
                 loadComponent: () => import('./features/admin/usage-limits.component').then(m => m.UsageLimitsComponent)
+            },
+            {
+                path: 'admin/message-templates',
+                loadComponent: () => import('./features/admin/message-templates.component').then(m => m.MessageTemplatesComponent)
+            },
+            {
+                path: 'admin/payment-reminders',
+                loadComponent: () => import('./features/admin/payment-reminders.component').then(m => m.PaymentRemindersComponent)
+            },
+            {
+                path: 'admin/followup-sequences',
+                loadComponent: () => import('./features/admin/followup-sequences.component').then(m => m.FollowupSequencesComponent)
+            },
+            {
+                path: 'admin/gst-report',
+                loadComponent: () => import('./features/admin/gst-report.component').then(m => m.GstReportComponent)
             }
         ]
     },
@@ -203,6 +239,18 @@ export const routes: Routes = [
             {
                 path: 'invoices',
                 loadComponent: () => import('./features/super-admin/sa-invoices.component').then(m => m.SaInvoicesComponent)
+            },
+            {
+                path: 'observability',
+                loadComponent: () => import('./features/super-admin/sa-observability.component').then(m => m.SaObservabilityComponent)
+            },
+            {
+                path: 'login-logs',
+                loadComponent: () => import('./features/super-admin/sa-login-logs.component').then(m => m.SaLoginLogsComponent)
+            },
+            {
+                path: 'activity-logs',
+                loadComponent: () => import('./features/super-admin/sa-activity-logs.component').then(m => m.SaActivityLogsComponent)
             }
         ]
     },
