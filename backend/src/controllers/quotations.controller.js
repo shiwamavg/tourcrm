@@ -5,10 +5,11 @@ const db = require('../config/db');
 const generateQuotationNumber = async (conn, companyId) => {
     const year = new Date().getFullYear();
     const [rows] = await conn.query(
-        'SELECT COUNT(*) AS c FROM quotations WHERE YEAR(created_at) = ? AND company_id = ?',
-        [year, companyId]
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number, 10) AS UNSIGNED)), 0) + 1 AS next
+           FROM quotations WHERE quotation_number LIKE ?`,
+        [`QUO-${year}-%`]
     );
-    const seq = String(Number(rows[0].c) + 1).padStart(4, '0');
+    const seq = String(rows[0].next).padStart(4, '0');
     return `QUO-${year}-${seq}`;
 };
 
@@ -135,7 +136,7 @@ const createQuotation = async (req, res, next) => {
 
         const {
             lead_id, customer_name, customer_email, customer_phone,
-            destination_id, destination_text,
+            destination_id, destination_text, package_id,
             trip_start_date, trip_end_date, adults = 1,
             children_below_5 = 0, children_above_5 = 0, num_rooms = 1, package_type,
             markup_pct = 10, gst_pct = 5, valid_till, terms_notes, internal_notes,
@@ -160,12 +161,12 @@ const createQuotation = async (req, res, next) => {
         const [qResult] = await conn.query(
             `INSERT INTO quotations
                 (quotation_number, lead_id, customer_name, customer_email, customer_phone, created_by,
-                 destination_id, destination_text, trip_start_date, trip_end_date,
+                 destination_id, destination_text, package_id, trip_start_date, trip_end_date,
                  adults, children_below_5, children_above_5, num_rooms, package_type,
                  markup_pct, gst_pct, valid_till, terms_notes, internal_notes, status, company_id)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [quotationNumber, lead_id || null, customer_name, customer_email || null, customer_phone,
-             req.user.id, destination_id || null, destination_text || null,
+             req.user.id, destination_id || null, destination_text || null, package_id || null,
              trip_start_date, trip_end_date, adults, children_below_5, children_above_5, num_rooms,
              package_type, markup_pct, gst_pct, valid_till || null,
              terms_notes || null, internal_notes || null, 'draft', req.companyId]
@@ -213,7 +214,7 @@ const updateQuotation = async (req, res, next) => {
         const { id } = req.params;
         const {
             customer_name, customer_email, customer_phone,
-            destination_id, destination_text,
+            destination_id, destination_text, package_id,
             trip_start_date, trip_end_date, adults = 1,
             children_below_5 = 0, children_above_5 = 0, num_rooms = 1, package_type,
             markup_pct = 10, gst_pct = 5, valid_till, terms_notes, internal_notes,
@@ -233,13 +234,13 @@ const updateQuotation = async (req, res, next) => {
         await conn.query(
             `UPDATE quotations SET
                 customer_name=?, customer_email=?, customer_phone=?,
-                destination_id=?, destination_text=?,
+                destination_id=?, destination_text=?, package_id=?,
                 trip_start_date=?, trip_end_date=?,
                 adults=?, children_below_5=?, children_above_5=?, num_rooms=?, package_type=?,
                 markup_pct=?, gst_pct=?, valid_till=?, terms_notes=?, internal_notes=?
               WHERE id=? AND company_id=?`,
             [customer_name, customer_email || null, customer_phone,
-             destination_id || null, destination_text || null,
+             destination_id || null, destination_text || null, package_id || null,
              trip_start_date, trip_end_date,
              adults, children_below_5, children_above_5, num_rooms, package_type,
              markup_pct, gst_pct, valid_till || null, terms_notes || null, internal_notes || null,
@@ -288,10 +289,12 @@ const updateQuotation = async (req, res, next) => {
 // ── Get full quotation with all line items ───────────────────────
 const getQuotationById = async (id, companyId) => {
     const [q] = await db.query(
-        `SELECT q.*, d.name AS destination_name, su.full_name AS created_by_name
+        `SELECT q.*, d.name AS destination_name, su.full_name AS created_by_name,
+                p.title AS package_title
          FROM quotations q
          LEFT JOIN destinations d ON d.id = q.destination_id AND d.company_id = q.company_id
          LEFT JOIN staff_users su ON su.id = q.created_by AND su.company_id = q.company_id
+         LEFT JOIN packages p ON p.id = q.package_id AND p.company_id = q.company_id
          WHERE q.id = ? AND q.company_id = ?`, [id, companyId]
     );
     if (!q[0]) return null;
@@ -339,11 +342,13 @@ const listQuotations = async (req, res, next) => {
         const [rows] = await db.query(
             `SELECT q.id, q.quotation_number, q.status, q.trip_start_date, q.trip_end_date,
                     q.grand_total, q.adults, q.package_type, q.created_at,
-                    q.customer_name, q.customer_phone, q.destination_text,
-                     d.name AS destination_name, su.full_name AS created_by_name
+                    q.customer_name, q.customer_phone, q.destination_text, q.package_id,
+                    d.name AS destination_name, su.full_name AS created_by_name,
+                    p.title AS package_title
               FROM quotations q
               LEFT JOIN destinations d ON d.id = q.destination_id AND d.company_id = q.company_id
               LEFT JOIN staff_users su ON su.id = q.created_by AND su.company_id = q.company_id
+              LEFT JOIN packages p ON p.id = q.package_id AND p.company_id = q.company_id
              ${whereSql}
              ORDER BY q.created_at DESC
              LIMIT ? OFFSET ?`,

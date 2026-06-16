@@ -98,6 +98,46 @@ import { ToastService } from '../../core/services/toast.service';
                 }
             </div>
         </div>
+
+        <!-- 5. Predefined Packages Performance -->
+        <div class="report-card col-span-full">
+            <div class="card-header">
+                <h2>Predefined Packages Performance</h2>
+                <button class="export-btn" (click)="exportPackageCSV()">CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Package Name</th>
+                            <th>Enquiries (Leads)</th>
+                            <th>Confirmed Bookings</th>
+                            <th>Total Revenue</th>
+                            <th>Conversion Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (p of packagePerf(); track p.package_id) {
+                            <tr>
+                                <td><strong>{{ p.package_title }}</strong></td>
+                                <td>{{ p.leads_count }}</td>
+                                <td>{{ p.bookings_count }}</td>
+                                <td><strong>₹{{ p.total_revenue | number }}</strong></td>
+                                <td>
+                                    @if (p.leads_count > 0) {
+                                        {{ (p.bookings_count / p.leads_count * 100) | number:'1.0-1' }}%
+                                    } @else {
+                                        0%
+                                    }
+                                </td>
+                            </tr>
+                        } @empty {
+                            <tr><td colspan="5" class="empty">No package performance data available.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     `,
     styles: [`
@@ -127,6 +167,11 @@ import { ToastService } from '../../core/services/toast.service';
         .bar-value { min-width: 140px; text-align: right; font-weight: 600; color: #1f2937; }
         .capitalize { text-transform: capitalize; }
         .empty { text-align: center; color: #9ca3af; padding: 40px 0; }
+        .col-span-full { grid-column: 1 / -1; }
+        .report-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        .report-table th, .report-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .report-table th { background: #f9fafb; font-weight: 600; color: #4b5563; }
+        .report-table tr:hover { background: #f9fafb; }
     `]
 })
 export class ReportsComponent implements OnInit {
@@ -137,6 +182,7 @@ export class ReportsComponent implements OnInit {
     destSales = signal<any[]>([]);
     leadSources = signal<any[]>([]);
     monthlyRev = signal<any[]>([]);
+    packagePerf = signal<any[]>([]);
 
     ngOnInit() {
         this.loadReports();
@@ -161,6 +207,11 @@ export class ReportsComponent implements OnInit {
         this.reports.getMonthlyRevenue().subscribe({
             next: (data) => this.monthlyRev.set(data || []),
             error: () => this.toast.error('Failed to load monthly revenue data.')
+        });
+
+        this.reports.getPackagePerformance().subscribe({
+            next: (data) => this.packagePerf.set(data || []),
+            error: () => this.toast.error('Failed to load package performance data.')
         });
     }
 
@@ -200,6 +251,18 @@ export class ReportsComponent implements OnInit {
 
     exportRevenueCSV() {
         this.exportToCSV('Monthly_Revenue', ['Month', 'Revenue (INR)'], ['month', 'revenue'], this.monthlyRev());
+    }
+
+    exportPackageCSV() {
+        const data = this.packagePerf().map(p => ({
+            ...p,
+            conversion_rate: p.leads_count > 0 ? (p.bookings_count / p.leads_count * 100).toFixed(1) + '%' : '0%'
+        }));
+        this.exportToCSV('Package_Performance', 
+            ['Package', 'Enquiries (Leads)', 'Bookings', 'Revenue (INR)', 'Conversion Rate'], 
+            ['package_title', 'leads_count', 'bookings_count', 'total_revenue', 'conversion_rate'], 
+            data
+        );
     }
 
     private exportToCSV(filename: string, headers: string[], keys: string[], data: any[]) {

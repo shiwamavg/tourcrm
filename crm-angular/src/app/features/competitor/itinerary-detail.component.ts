@@ -86,7 +86,7 @@ import { ToastService } from '../../core/services/toast.service';
         .toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
         .btn.ghost { background:#f3f4f6; color:#374151; padding:6px 10px; border-radius:6px; text-decoration:none; font-size:13px; }
         .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; }
-        .btn.small { padding:4px 8px; font-size:12px; }
+        .btn.small { padding:4px 8px; font-size:12px; background:#0f766e; color:#fff; }
         .btn.warn { background:#b91c1c; }
         .meta { display:flex; gap:12px; font-size:13px; color:#6b7280; margin-bottom:10px; }
         .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; text-transform:capitalize; }

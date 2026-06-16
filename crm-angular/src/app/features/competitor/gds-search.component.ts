@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GDSService } from '../../core/services/competitor-features.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ApiService } from '../../core/services/api.service';
 
 @Component({
     selector: 'app-gds-search',
@@ -12,6 +13,22 @@ import { ToastService } from '../../core/services/toast.service';
     <div class="gds-header">
         <h1>Live Supplier Search (GDS Engine)</h1>
         <p>Query mock Global Distribution System (GDS) integrations for flights and hotels in real-time.</p>
+    </div>
+
+    <!-- Target Quotation Selector -->
+    <div class="quotation-selector-bar" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: #4b5563;">Add search results to draft quotation:</span>
+            <select [ngModel]="selectedQuotationId()" (ngModelChange)="selectedQuotationId.set($event)" style="padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; min-width: 280px; outline:none;">
+                <option [ngValue]="null">-- Select a Quotation (View Only) --</option>
+                @for (q of draftQuotations(); track q.id) {
+                    <option [ngValue]="q.id">{{ q.quotation_number }} - {{ q.customer_name }} ({{ q.destination_text }})</option>
+                }
+            </select>
+        </div>
+        @if (selectedQuotationId()) {
+            <span style="font-size:12px; color:#0d9488; font-weight:600;">⚡ Quotation totals will recalculate automatically</span>
+        }
     </div>
 
     <div class="tabs">
@@ -71,6 +88,11 @@ import { ToastService } from '../../core/services/toast.service';
                             <span class="seats">{{ f.seatsAvailable }} seats left</span>
                             <span class="price-val">₹{{ f.price | number }}</span>
                             <span class="class-lbl">{{ f.cabinClass }}</span>
+                            @if (selectedQuotationId()) {
+                                <button class="btn btn-sm" style="margin-top: 8px; padding: 4px 8px; font-size: 11px; width:auto;" (click)="addFlightToQuote(f)" [disabled]="addingToQuote()">
+                                    + Add to Quote
+                                </button>
+                            }
                         </div>
                     </div>
                 }
@@ -120,9 +142,16 @@ import { ToastService } from '../../core/services/toast.service';
                                             <strong>{{ room.type }}</strong>
                                             <p class="desc">{{ room.description }}</p>
                                         </div>
-                                        <div class="room-price">
-                                            <span class="price-val">₹{{ room.price | number }}</span>
-                                            <span class="per-night">/ night</span>
+                                        <div class="room-price" style="display:flex; flex-direction:column; align-items:flex-end;">
+                                            <div>
+                                                <span class="price-val">₹{{ room.price | number }}</span>
+                                                <span class="per-night">/ night</span>
+                                            </div>
+                                            @if (selectedQuotationId()) {
+                                                <button class="btn btn-sm" style="margin-top: 4px; padding: 2px 6px; font-size: 11px; width:auto;" (click)="addHotelToQuote(h, room)" [disabled]="addingToQuote()">
+                                                    + Add to Quote
+                                                </button>
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -209,10 +238,14 @@ import { ToastService } from '../../core/services/toast.service';
 export class GDSSearchComponent implements OnInit {
     private gds = inject(GDSService);
     private toast = inject(ToastService);
+    private api = inject(ApiService);
 
     searchType = signal<'flights' | 'hotels'>('flights');
     loading = signal(false);
     searched = signal(false);
+    addingToQuote = signal(false);
+    selectedQuotationId = signal<number | null>(null);
+    draftQuotations = signal<any[]>([]);
 
     // Mock search forms
     flightForm = {
@@ -240,6 +273,19 @@ export class GDSSearchComponent implements OnInit {
         this.flightForm.date = tomorrow;
         this.hotelForm.checkIn = tomorrow;
         this.hotelForm.checkOut = dayAfter;
+
+        this.loadDraftQuotations();
+    }
+
+    loadDraftQuotations() {
+        this.api.listQuotations({ status: 'draft', limit: 100 }).subscribe({
+            next: (res) => {
+                this.draftQuotations.set(res.items || []);
+            },
+            error: (err) => {
+                this.toast.error('Failed to load draft quotations: ' + (err.error?.error || err.message));
+            }
+        });
     }
 
     searchFlights() {
@@ -268,6 +314,95 @@ export class GDSSearchComponent implements OnInit {
             error: (err) => {
                 this.loading.set(false);
                 this.toast.error(err.error?.message || 'Hotel search failed.');
+            }
+        });
+    }
+
+    addFlightToQuote(flight: any) {
+        const qId = this.selectedQuotationId();
+        if (!qId) return;
+
+        this.addingToQuote.set(true);
+        this.api.getQuotation(qId).subscribe({
+            next: (quote) => {
+                const flights = quote.flights || [];
+                flights.push({
+                    airline: flight.airline,
+                    route: `${flight.from}-${flight.to}`,
+                    flight_date: flight.date,
+                    fare_per_adult: flight.price,
+                    fare_per_child: 0,
+                    num_adults: quote.adults || 1,
+                    num_children: (quote.children_below_5 || 0) + (quote.children_above_5 || 0)
+                });
+
+                const payload = {
+                    ...quote,
+                    flights
+                };
+
+                this.api.updateQuotation(qId, payload).subscribe({
+                    next: () => {
+                        this.addingToQuote.set(false);
+                        this.toast.success(`Successfully added flight ${flight.flightNumber} to Quotation ${quote.quotation_number}!`);
+                    },
+                    error: (err) => {
+                        this.addingToQuote.set(false);
+                        this.toast.error('Failed to add flight: ' + (err.error?.error || err.message));
+                    }
+                });
+            },
+            error: (err) => {
+                this.addingToQuote.set(false);
+                this.toast.error('Failed to fetch quotation: ' + (err.error?.error || err.message));
+            }
+        });
+    }
+
+    addHotelToQuote(hotel: any, room: any) {
+        const qId = this.selectedQuotationId();
+        if (!qId) return;
+
+        this.addingToQuote.set(true);
+        this.api.getQuotation(qId).subscribe({
+            next: (quote) => {
+                let nights = 1;
+                if (hotel.checkIn && hotel.checkOut) {
+                    const diff = new Date(hotel.checkOut).getTime() - new Date(hotel.checkIn).getTime();
+                    nights = Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)));
+                }
+
+                const hotels = quote.hotels || [];
+                hotels.push({
+                    hotel_name: hotel.name,
+                    star_rating: hotel.stars,
+                    room_type: room.type,
+                    meal_plan: 'none',
+                    charge_per_night: room.price,
+                    num_nights: nights,
+                    num_rooms: quote.num_rooms || 1,
+                    special_charges: 0
+                });
+
+                const payload = {
+                    ...quote,
+                    hotels
+                };
+
+                this.api.updateQuotation(qId, payload).subscribe({
+                    next: () => {
+                        this.addingToQuote.set(false);
+                        this.toast.success(`Successfully added ${hotel.name} (${room.type}) to Quotation ${quote.quotation_number}!`);
+                    },
+                    error: (err) => {
+                        this.addingToQuote.set(false);
+                        this.toast.error('Failed to add hotel: ' + (err.error?.error || err.message));
+                    }
+                });
+            },
+            error: (err) => {
+                this.addingToQuote.set(false);
+                this.toast.error('Failed to fetch quotation: ' + (err.error?.error || err.message));
             }
         });
     }

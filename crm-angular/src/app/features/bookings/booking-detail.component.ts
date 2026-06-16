@@ -4,7 +4,8 @@ import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
-import { PaymentGateway, PaymentStatus2 } from '../../core/models';
+import { ToastService } from '../../core/services/toast.service';
+import { PaymentGateway, PaymentStatus2, BookingTraveller } from '../../core/models';
 import { FollowupTimelineComponent } from '../../shared/components/followup-timeline.component';
 
 @Component({
@@ -31,6 +32,9 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                     @if (booking()!.quotation_number) {
                         <a [routerLink]="['/quotations', booking()!.quotation_id]" class="link">{{ booking()!.quotation_number }}</a>
                     } @else { — }
+                    @if (booking()!.package_title) {
+                        • Package: <strong>{{ booking()!.package_title }}</strong>
+                    }
                 </p>
             </div>
             <div class="flex">
@@ -74,6 +78,78 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                     @else { • <strong class="text-success">Fully paid</strong> }
                 </div>
             </div>
+        </div>
+
+        <!-- Travellers -->
+        <div class="card">
+            <h2>👤 Travellers
+                @if (!travellersEditing()) {
+                    <button class="btn btn-sm btn-outline" style="margin-left:auto" (click)="startEditTravellers()">
+                        {{ travellers().length ? '✏️ Edit' : '+ Add' }}
+                    </button>
+                }
+            </h2>
+
+            @if (travellersLoading()) {
+                <span class="spinner"></span>
+            } @else if (travellersEditing()) {
+                <p class="text-muted" style="margin-bottom:12px;font-size:13px">
+                    Enter names for all travellers based on the booking pax.
+                    <strong>{{ booking()!.adults }} adult(s)</strong>
+                    @if (booking()!.children_below_5) { • <strong>{{ booking()!.children_below_5 }} child(ren) below 5y</strong> }
+                    @if (booking()!.children_above_5) { • <strong>{{ booking()!.children_above_5 }} child(ren) above 5y</strong> }
+                </p>
+                <div class="traveller-form">
+                    @for (t of travellerForm(); track $index; let i = $index) {
+                        <div class="traveller-row">
+                            <span class="traveller-index">{{ i + 1 }}</span>
+                            <div class="traveller-fields">
+                                <input type="text" [(ngModel)]="t.full_name"
+                                       [placeholder]="'Full name (' + (t.traveller_type || 'adult').replace('_', ' ') + ')'" />
+                                <input type="text" [(ngModel)]="t.aadhar_number"
+                                       placeholder="Aadhar number (optional)" style="max-width:180px" />
+                            </div>
+                            <span class="traveller-type-badge" [class]="'type-' + t.traveller_type">
+                                {{ t.traveller_type === 'adult' ? 'Adult' : t.traveller_type === 'child_below_5' ? 'Child <5' : 'Child 5+' }}
+                            </span>
+                        </div>
+                    }
+                </div>
+                <div class="flex" style="gap:8px;margin-top:12px">
+                    <button class="btn btn-primary btn-sm" (click)="saveTravellers()" [disabled]="travellerSaving()">
+                        {{ travellerSaving() ? 'Saving…' : '✓ Save Travellers' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline" (click)="cancelEditTravellers()">Cancel</button>
+                </div>
+            } @else if (travellers().length > 0) {
+                <div class="table-wrap" style="box-shadow:none">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Name</th><th>Aadhar Number</th><th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (t of travellers(); track t.id; let i = $index) {
+                                <tr>
+                                    <td>{{ i + 1 }}</td>
+                                    <td><strong>{{ t.full_name }}</strong></td>
+                                    <td>{{ t.aadhar_number || '—' }}</td>
+                                    <td>
+                                        <span class="traveller-type-badge" [class]="'type-' + t.traveller_type">
+                                            {{ t.traveller_type === 'adult' ? 'Adult' : t.traveller_type === 'child_below_5' ? 'Child <5' : 'Child 5+' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            } @else {
+                <p class="text-muted">No travellers recorded yet.
+                    <button class="btn btn-sm btn-outline" (click)="startEditTravellers()">+ Add travellers</button>
+                </p>
+            }
         </div>
 
         <!-- Hotels -->
@@ -346,6 +422,17 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
     }
     `,
     styles: [`
+        .traveller-form { display:flex; flex-direction:column; gap:6px; }
+        .traveller-row { display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--gray-50); border-radius:6px; }
+        .traveller-index { width:24px; height:24px; border-radius:50%; background:#4f46e5; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+        .traveller-fields { flex:1; display:flex; gap:8px; }
+        .traveller-fields input { flex:1; padding:6px 10px; border:1px solid var(--gray-200); border-radius:5px; font:inherit; font-size:13px; }
+        .traveller-fields input:focus { outline:none; border-color:#4f46e5; }
+        .traveller-type-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:8px; white-space:nowrap; }
+        .type-adult { background:#dbeafe; color:#1e40af; }
+        .type-child_below_5 { background:#fef3c7; color:#92400e; }
+        .type-child_above_5 { background:#d1fae5; color:#065f46; }
+        .card h2 { display:flex; align-items:center; gap:8px; }
         .task-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--gray-100); transition:background .1s; }
         .task-row:hover { background:var(--gray-50); }
         .task-row.completed { opacity:.6; }
@@ -367,6 +454,7 @@ export class BookingDetailComponent implements OnInit {
     private api  = inject(ApiService);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
+    private toast = inject(ToastService);
 
     loading = signal(true);
     booking = signal<any | null>(null);
@@ -382,6 +470,13 @@ export class BookingDetailComponent implements OnInit {
         offline_reference: '',
         offline_note: ''
     };
+
+    // Booking travellers
+    travellers = signal<BookingTraveller[]>([]);
+    travellersLoading = signal(false);
+    travellersEditing = signal(false);
+    travellerSaving = signal(false);
+    travellerForm = signal<Partial<BookingTraveller>[]>([]);
 
     // Booking tasks
     bookingTasks = signal<any[]>([]);
@@ -404,8 +499,75 @@ export class BookingDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) { this.loading.set(false); return; }
         this.api.getBooking(id).subscribe({
-            next: b => { this.booking.set(b); this.loading.set(false); this.loadTasks(); },
+            next: b => { this.booking.set(b); this.loading.set(false); this.loadTasks(); this.loadTravellers(); },
             error: ()  => this.loading.set(false)
+        });
+    }
+
+    // ── Traveller Methods ────────────────────────────────────
+    loadTravellers() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id) return;
+        this.travellersLoading.set(true);
+        this.api.listBookingTravellers(id).subscribe({
+            next: r => { this.travellers.set(r); this.travellersLoading.set(false); },
+            error: () => this.travellersLoading.set(false)
+        });
+    }
+
+    buildTravellerForm() {
+        const b = this.booking();
+        if (!b) return;
+        const existing = this.travellers();
+        if (existing.length > 0) {
+            this.travellerForm.set(existing.map(t => ({ ...t })));
+            return;
+        }
+        const form: Partial<BookingTraveller>[] = [];
+        const adults = b.adults || 0;
+        const cBelow5 = b.children_below_5 || 0;
+        const cAbove5 = b.children_above_5 || 0;
+        for (let i = 0; i < adults; i++) {
+            form.push({ full_name: '', aadhar_number: '', traveller_type: 'adult', booking_id: b.id });
+        }
+        for (let i = 0; i < cBelow5; i++) {
+            form.push({ full_name: '', aadhar_number: '', traveller_type: 'child_below_5', booking_id: b.id });
+        }
+        for (let i = 0; i < cAbove5; i++) {
+            form.push({ full_name: '', aadhar_number: '', traveller_type: 'child_above_5', booking_id: b.id });
+        }
+        this.travellerForm.set(form);
+    }
+
+    startEditTravellers() {
+        this.buildTravellerForm();
+        this.travellersEditing.set(true);
+    }
+
+    cancelEditTravellers() {
+        this.travellersEditing.set(false);
+    }
+
+    saveTravellers() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id) return;
+        const form = this.travellerForm();
+        if (form.some(t => !t.full_name?.trim())) {
+            this.toast.error('All traveller names are required.');
+            return;
+        }
+        this.travellerSaving.set(true);
+        this.api.saveBookingTravellers(id, form).subscribe({
+            next: r => {
+                this.travellers.set(r);
+                this.travellersEditing.set(false);
+                this.travellerSaving.set(false);
+                this.toast.success('Travellers saved');
+            },
+            error: () => {
+                this.travellerSaving.set(false);
+                this.toast.error('Failed to save travellers');
+            }
         });
     }
 

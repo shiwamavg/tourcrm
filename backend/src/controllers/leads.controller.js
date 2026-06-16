@@ -64,12 +64,14 @@ const listLeads = async (req, res, next) => {
         const offset = (Math.max(1, +page) - 1) * +limit;
         const [rows] = await db.query(
             `SELECT l.*, su.full_name AS assigned_to_name,
-                    q.quotation_number AS converted_quotation_number
+                    q.quotation_number AS converted_quotation_number,
+                    p.title AS package_title
                FROM leads l
           LEFT JOIN staff_users su ON su.id = l.assigned_to AND su.company_id = l.company_id
           LEFT JOIN quotations  q  ON q.id  = l.converted_quotation_id AND q.company_id = l.company_id
+          LEFT JOIN packages     p  ON p.id  = l.package_id AND p.company_id = l.company_id
                ${whereSql}
-           ORDER BY l.id DESC
+            ORDER BY l.id DESC
               LIMIT ? OFFSET ?`,
             [...params, +limit, offset]
         );
@@ -112,10 +114,12 @@ const getLead = async (req, res, next) => {
     try {
         const [rows] = await db.query(
             `SELECT l.*, su.full_name AS assigned_to_name,
-                    q.quotation_number AS converted_quotation_number
+                    q.quotation_number AS converted_quotation_number,
+                    p.title AS package_title
                FROM leads l
           LEFT JOIN staff_users su ON su.id = l.assigned_to AND su.company_id = l.company_id
           LEFT JOIN quotations  q  ON q.id  = l.converted_quotation_id AND q.company_id = l.company_id
+          LEFT JOIN packages     p  ON p.id  = l.package_id AND p.company_id = l.company_id
               WHERE l.id = ? AND l.company_id = ?`,
             [req.params.id, req.companyId]
         );
@@ -127,7 +131,7 @@ const getLead = async (req, res, next) => {
 // ── create (staff) ───────────────────────────────────────────
 const createLead = async (req, res, next) => {
     try {
-        const { full_name, email, phone, destination_text, source = 'manual',
+        const { full_name, email, phone, destination_text, package_id, source = 'manual',
                 notes, assigned_to, follow_up_at, source_meta } = req.body || {};
         if (!sanitize(full_name)) return res.status(400).json({ error: 'full_name is required' });
         if (!isPhone(phone))      return res.status(400).json({ error: 'valid phone is required' });
@@ -143,12 +147,13 @@ const createLead = async (req, res, next) => {
 
         const [r] = await db.query(
             `INSERT INTO leads
-                (full_name, email, phone, destination_text, source, status, assigned_to, follow_up_at, notes, source_meta, created_by, company_id)
-             VALUES (?,?,?,?,?, 'new', ?, ?, ?, ?, ?, ?)`,
+                (full_name, email, phone, destination_text, package_id, source, status, assigned_to, follow_up_at, notes, source_meta, created_by, company_id)
+             VALUES (?,?,?,?,?,?, 'new', ?, ?, ?, ?, ?, ?)`,
             [sanitize(full_name),
              sanitize(email) || null,
              sanitize(phone),
              sanitize(destination_text) || null,
+             package_id || null,
              source,
              assigned_to || null,
              follow_up_at || null,
@@ -184,7 +189,7 @@ const createLead = async (req, res, next) => {
 const updateLead = async (req, res, next) => {
     try {
         const id = req.params.id;
-        const allowed = ['full_name', 'email', 'phone', 'destination_text', 'notes',
+        const allowed = ['full_name', 'email', 'phone', 'destination_text', 'package_id', 'notes',
                          'assigned_to', 'follow_up_at', 'source_meta'];
         const sets = []; const params = [];
         for (const k of allowed) {
@@ -279,8 +284,8 @@ const convertLead = async (req, res, next) => {
         const year = new Date().getFullYear();
         const [[{ next }]] = await db.query(
             `SELECT COALESCE(MAX(CAST(SUBSTRING(quotation_number, 10) AS UNSIGNED)), 0) + 1 AS next
-               FROM quotations WHERE quotation_number LIKE ? AND company_id = ?`,
-            [`QUO-${year}-%`, req.companyId]
+               FROM quotations WHERE quotation_number LIKE ?`,
+            [`QUO-${year}-%`]
         );
         const quotation_number = `QUO-${year}-${String(next).padStart(4, '0')}`;
 
@@ -304,18 +309,19 @@ const convertLead = async (req, res, next) => {
             const [qIns] = await conn.query(
                 `INSERT INTO quotations
                     (quotation_number, lead_id, customer_name, customer_email, customer_phone,
-                     destination_text, trip_start_date, trip_end_date, package_type, num_rooms,
+                     destination_text, package_id, trip_start_date, trip_end_date, package_type, num_rooms,
                      adults, children_below_5, children_above_5,
                      hotel_total, car_total, flight_total, misc_total, subtotal,
                      markup_pct, markup_amount, gst_pct, gst_amount, grand_total,
                      status, version, internal_notes, created_by, company_id)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 0,0,0,0,0, 0,0,0,0,0, 'draft', 1, ?, ?, ?)`,
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0,0,0,0,0, 0,0,0,0,0, 'draft', 1, ?, ?, ?)`,
                 [quotation_number,
                  lead.id,
                  lead.full_name,
                  lead.email,
                  lead.phone,
                  lead.destination_text,
+                 lead.package_id || null,
                  isoDate(start),
                  isoDate(end),
                  'hotel_car',

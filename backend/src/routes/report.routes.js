@@ -10,5 +10,6 @@ router.get('/sales-by-agent', ctrl.getSalesByAgent);
 router.get('/sales-by-destination', ctrl.getSalesByDestination);
 router.get('/lead-sources', ctrl.getLeadSources);
 router.get('/monthly-revenue', ctrl.getMonthlyRevenue);
+router.get('/package-performance', ctrl.getPackagePerformance);
 
 module.exports = router;

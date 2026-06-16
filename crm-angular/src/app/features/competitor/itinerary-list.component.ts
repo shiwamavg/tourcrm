@@ -64,7 +64,7 @@ import { ToastService } from '../../core/services/toast.service';
         h1 { margin:0 0 14px; font-size:1.3rem; }
         .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; text-decoration:none; display:inline-block; }
         .btn.ghost { background:#f3f4f6; color:#374151; }
-        .btn.small { padding:4px 8px; font-size:12px; }
+        .btn.small { padding:4px 8px; font-size:12px; background:#0f766e; color:#fff; }
         .btn.warn { background:#b91c1c; }
         .form-panel { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; margin-bottom:14px; max-width:540px; }
         .form-panel label { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; font-size:12px; color:#374151; }
@@ -77,7 +77,7 @@ import { ToastService } from '../../core/services/toast.service';
         table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; }
         th, td { padding:10px; text-align:left; border-bottom:1px solid #f3f4f6; font-size:13px; }
         th { background:#f9fafb; color:#6b7280; text-transform:uppercase; font-size:11px; }
-        td a { color:#0f766e; text-decoration:none; font-weight:600; }
+        td a:not(.btn) { color:#0f766e; text-decoration:none; font-weight:600; }
         .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; text-transform:capitalize; }
         .badge-active { background:#dcfce7; color:#166534; }
         .badge-inactive { background:#f3f4f6; color:#6b7280; }

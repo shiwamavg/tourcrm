@@ -3,7 +3,7 @@ const db = require('../config/db');
 async function list(req, res) {
     const companyId = req.companyId;
     try {
-        const { status, priority, assigned_to, today } = req.query;
+        const { status, priority, assigned_to, today, date_from, date_to } = req.query;
         let sql = `SELECT r.*, su.full_name AS assigned_name FROM reminders r LEFT JOIN staff_users su ON r.assigned_to = su.id AND su.company_id = r.company_id WHERE r.company_id = ?`;
         const params = [companyId];
 
@@ -21,6 +21,8 @@ async function list(req, res) {
         if (today === '1') {
             sql += ' AND DATE(r.remind_at) = CURDATE()';
         }
+        if (date_from) { sql += ' AND DATE(r.remind_at) >= ?'; params.push(date_from); }
+        if (date_to) { sql += ' AND DATE(r.remind_at) <= ?'; params.push(date_to); }
 
         sql += ' ORDER BY r.remind_at ASC';
         const [rows] = await db.query(sql, params);

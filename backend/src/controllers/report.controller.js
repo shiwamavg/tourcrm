@@ -74,9 +74,31 @@ async function getMonthlyRevenue(req, res) {
     }
 }
 
+async function getPackagePerformance(req, res) {
+    const companyId = req.companyId;
+    try {
+        const [rows] = await db.query(
+            `SELECT p.id as package_id,
+                    p.title as package_title,
+                    p.price as package_price,
+                    (SELECT COUNT(*) FROM leads l WHERE l.package_id = p.id AND l.company_id = p.company_id) as leads_count,
+                    (SELECT COUNT(*) FROM bookings b WHERE b.package_id = p.id AND b.company_id = p.company_id AND b.status != 'cancelled') as bookings_count,
+                    (SELECT COALESCE(SUM(b.total_amount), 0) FROM bookings b WHERE b.package_id = p.id AND b.company_id = p.company_id AND b.status != 'cancelled') as total_revenue
+             FROM packages p
+             WHERE p.company_id = ?
+             ORDER BY total_revenue DESC`,
+            [companyId]
+        );
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
 module.exports = {
     getSalesByAgent,
     getSalesByDestination,
     getLeadSources,
-    getMonthlyRevenue
+    getMonthlyRevenue,
+    getPackagePerformance
 };

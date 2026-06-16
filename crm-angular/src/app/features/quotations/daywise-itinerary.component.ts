@@ -45,7 +45,7 @@ const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
                         </div>
                         <div class="field">
                             <label>Hotel Tonight</label>
-                            <select [(ngModel)]="d.hotel_name">
+                            <select [ngModel]="d.hotel_name" (ngModelChange)="onHotelSelect(d, $event)">
                                 <option value="">— Select hotel —</option>
                                 @for (h of quoteHotels(); track h.id) {
                                     <option [value]="h.hotel_name">{{ h.hotel_name }} ({{ h.room_type }})</option>
@@ -286,6 +286,14 @@ export class DaywiseItineraryComponent implements OnInit {
         } else {
             d.itenary_name = '';
             d.details = '';
+        }
+    }
+
+    onHotelSelect(d: any, hotelName: string) {
+        d.hotel_name = hotelName;
+        const h = this.quoteHotels().find(h => h.hotel_name === hotelName);
+        if (h) {
+            d.amt = Number(h.charge_per_night) || 0;
         }
     }
 

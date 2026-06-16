@@ -9,6 +9,7 @@ const invCtl = require('../controllers/invoices.controller');
 router.use(authenticate);
 
 router.post('/', checkQuota('bookings'), ctl.createBooking);
+router.get('/calendar',               ctl.getCalendarBookings);
 router.get('/',                       ctl.listBookings);
 router.get('/:id',                    ctl.getBooking);
 router.patch('/:id/status',           ctl.updateStatus);
@@ -16,3 +17,4 @@ router.get('/:id/payments',           payCtl.listByBooking);
 router.get('/:id/invoices',           invCtl.listByBooking);
 
 module.exports = router;
+

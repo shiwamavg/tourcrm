@@ -1,5 +1,6 @@
 // Quotation Builder — Angular 22 multi-step form (signals + reactive forms)
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import {
     FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule, AbstractControl
@@ -28,7 +29,7 @@ type PackageType =
     <div class="page-header">
         <div>
             <h1>{{ editId() ? 'Edit Quotation' : 'New Quotation' }}</h1>
-            <p>Step {{ currentStep() }} of 7 — {{ stepLabel() }}</p>
+            <p>Step {{ visibleStepNum() }} of {{ visibleSteps().length }} — {{ stepLabel() }}</p>
         </div>
         <div>
             <span class="info-badge">Live total: ₹{{ totals().grandTotal | number:'1.0-0' }}</span>
@@ -41,7 +42,7 @@ type PackageType =
             <div class="step-item"
                  [class.active]="currentStep() === s.num"
                  [class.done]="currentStep() > s.num">
-                <div class="step-circle">{{ currentStep() > s.num ? '✓' : s.num }}</div>
+                <div class="step-circle">{{ currentStep() > s.num ? '✓' : $index + 1 }}</div>
                 <span>{{ s.label }}</span>
             </div>
         }
@@ -153,7 +154,7 @@ type PackageType =
         }
 
         <!-- ── STEP 2: Hotels ──────────────────────────── -->
-        @if (currentStep() === 2) {
+        @if (currentStep() === 2 && hasHotel()) {
         <div class="card">
             <div class="section-header">
                 <h2 style="margin:0;border:none;padding:0">🏨 Hotel Details</h2>
@@ -268,7 +269,7 @@ type PackageType =
         }
 
         <!-- ── STEP 3: Cars ────────────────────────────── -->
-        @if (currentStep() === 3) {
+        @if (currentStep() === 3 && hasCar()) {
         <div class="card">
             <div class="section-header">
                 <h2 style="margin:0;border:none;padding:0">🚗 Car / Cab Details</h2>
@@ -364,7 +365,7 @@ type PackageType =
         }
 
         <!-- ── STEP 4: Flights ─────────────────────────── -->
-        @if (currentStep() === 4) {
+        @if (currentStep() === 4 && hasFlight()) {
         <div class="card">
             <div class="section-header">
                 <h2 style="margin:0;border:none;padding:0">✈ Flight Details</h2>
@@ -596,7 +597,10 @@ type PackageType =
             </div>
             <div>
                 @if (currentStep() < 7) {
-                    <button type="button" class="btn btn-primary" (click)="nextStep()">Continue →</button>
+                    <button type="button" class="btn btn-primary" (click)="continueStep()" [disabled]="saving()">
+                        @if (saving()) { <span class="spinner"></span> Saving… }
+                        @else { Continue → }
+                    </button>
                 } @else {
                     <button type="button" class="btn" (click)="save('draft')" [disabled]="saving()">
                         @if (saving()) { <span class="spinner"></span> Saving… }
@@ -692,6 +696,7 @@ export class QuotationBuilderComponent implements OnInit {
         ])
     });
 
+    formValue = toSignal(this.form.valueChanges, { initialValue: this.form.value });
     nights = signal(0);
 
     // re-evaluate on every form change to drive the live total signal
@@ -747,7 +752,7 @@ export class QuotationBuilderComponent implements OnInit {
                         this.hotelsArray.push(this.fb.group({
                             hotel_rate_id: [h.hotel_rate_id || null],
                             hotel_name: [h.hotel_name, Validators.required],
-                            star_rating: [h.star_rating || null],
+                            star_rating: [h.star_rating ? Number(h.star_rating) : null],
                             room_type: [h.room_type || 'deluxe'],
                             meal_plan: [h.meal_plan || 'breakfast'],
                             charge_per_night: [h.charge_per_night, [Validators.required, Validators.min(0)]],
@@ -837,18 +842,22 @@ export class QuotationBuilderComponent implements OnInit {
     }
 
     // ── Derived UI state ─────────────────────────────────
-    hasHotel():  boolean { return (this.form.value.package_type || '').includes('hotel'); }
-    hasCar():    boolean { return (this.form.value.package_type || '').includes('car'); }
-    hasFlight(): boolean { return (this.form.value.package_type || '').includes('flight'); }
+    hasHotel():  boolean { return (this.formValue()?.package_type as string || '').includes('hotel'); }
+    hasCar():    boolean { return (this.formValue()?.package_type as string || '').includes('car'); }
+    hasFlight(): boolean { return (this.formValue()?.package_type as string || '').includes('flight'); }
 
     visibleSteps = computed(() => {
-        const pkg = this.form.value.package_type || '';
+        const pkg = (this.formValue()?.package_type as string) || '';
         return this.allSteps.filter(s => {
             if (s.num === 2) return pkg.includes('hotel');
             if (s.num === 3) return pkg.includes('car');
             if (s.num === 4) return pkg.includes('flight');
             return true;
         });
+    });
+
+    visibleStepNum = computed(() => {
+        return this.visibleSteps().findIndex(s => s.num === this.currentStep()) + 1;
     });
 
     stepLabel(): string {
@@ -1043,7 +1052,7 @@ export class QuotationBuilderComponent implements OnInit {
         return {
             hotel_rate_id:     r.id,
             hotel_name:        r.hotel_name,
-            star_rating:       r.star_rating,
+            star_rating:       Number(r.star_rating) || null,
             room_type:         r.room_type,
             meal_plan:         r.meal_plan,
             charge_per_night:  r.charge_per_night,
@@ -1123,6 +1132,36 @@ export class QuotationBuilderComponent implements OnInit {
     removeCar(i: number)    { this.carsArray.removeAt(i); }
     removeFlight(i: number) { this.flightsArray.removeAt(i); }
     removeMisc(i: number)   { this.miscArray.removeAt(i); }
+
+    // ── Continue (save draft + step) ────────────────────
+    continueStep() {
+        this.error.set(null);
+        this.saving.set(true);
+        const payload = {
+            ...this.form.value,
+            status: 'draft' as const,
+            hotels:  (this.form.value.hotels  || []).filter((h: any) => h.hotel_name),
+            cars:    (this.form.value.cars    || []).filter((c: any) => c.car_type_name),
+            flights: (this.form.value.flights || []).filter((f: any) => f.airline || f.route),
+            misc:    (this.form.value.misc    || []).filter((m: any) => m.label),
+            daywise_itinerary: this.builderDays()
+        };
+        const obs = this.editId()
+            ? this.api.updateQuotation(this.editId()!, payload)
+            : this.api.createQuotation(payload);
+        obs.subscribe({
+            next: (q: Quotation) => {
+                this.saving.set(false);
+                if (!this.editId()) this.editId.set(q.id);
+                this.nextStep();
+            },
+            error: (err) => {
+                this.saving.set(false);
+                this.error.set(err?.error?.error || 'Failed to save draft.');
+                this.nextStep();
+            }
+        });
+    }
 
     // ── Step navigation (skips irrelevant steps) ────────
     nextStep() {

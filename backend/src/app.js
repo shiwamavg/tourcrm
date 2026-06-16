@@ -48,6 +48,9 @@ app.post('/api/payments/cashfree/subscription-webhook',
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
@@ -65,6 +68,7 @@ app.use(rateLimiter);
 
 // Public SaaS routes
 app.use('/api/subscription-packages', require('./routes/subscription.routes'));
+app.use('/api/packages', require('./routes/packages.routes'));
 
 // CRM Routes
 app.use('/api/auth',       require('./routes/auth.routes'));
@@ -96,6 +100,7 @@ app.use('/api/message-templates', require('./routes/message-template.routes'));
 app.use('/api/payment-reminders', require('./routes/payment-reminder.routes'));
 app.use('/api/followup-sequences', require('./routes/followup-sequence.routes'));
 app.use('/api/booking-tasks',     require('./routes/booking-task.routes'));
+app.use('/api/booking-travellers', require('./routes/booking-traveller.routes'));
 
 // Competitor features
 app.use('/api/b2b',               require('./routes/b2b.routes'));

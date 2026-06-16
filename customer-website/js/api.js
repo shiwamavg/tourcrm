@@ -60,6 +60,11 @@ const API = {
     },
     publicReviews()              { return this._fetch('/reviews'); },
 
+    // ── Predefined Packages ────────────────────────────────
+    publicPackages(companyId = 1) { return this._fetch(`/packages?company_id=${companyId}`); },
+    publicPackageDetail(id)       { return this._fetch(`/packages/${id}`); },
+    bookPackage(id, payload)      { return this._fetch(`/packages/${id}/book`, { method: 'POST', body: payload }); },
+
     // ── Invoice PDF (portal-authenticated) ────────────────
     // The customer-website uses the portal token, so it calls the
     // portal-scoped route at /api/portal/invoices/:id/download.

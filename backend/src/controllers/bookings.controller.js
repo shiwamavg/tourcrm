@@ -21,10 +21,12 @@ const listBookings = async (req, res, next) => {
             `SELECT b.id, b.booking_number, b.customer_name, b.customer_phone, b.customer_email,
                     b.trip_start_date, b.trip_end_date, b.total_amount, b.amount_paid,
                     b.balance_due, b.status, b.payment_status, b.created_at,
-                    b.destination_text, q.package_type, d.name AS destination_name
+                    b.destination_text, q.package_type, d.name AS destination_name, b.package_id,
+                    p.title AS package_title
                FROM bookings b
                LEFT JOIN quotations q ON q.id = b.quotation_id AND q.company_id = b.company_id
                LEFT JOIN destinations d ON d.id = q.destination_id AND d.company_id = b.company_id
+               LEFT JOIN packages p ON p.id = b.package_id AND p.company_id = b.company_id
                ${whereSql}
               ORDER BY b.id DESC
               LIMIT ? OFFSET ?`,
@@ -42,12 +44,14 @@ const getBooking = async (req, res, next) => {
         const [rows] = await db.query(
             `SELECT b.*, d.name AS destination_name, q.quotation_number, q.package_type,
                     pq.quotation_number AS parent_quotation_number,
-                    su.full_name AS created_by_name
+                    su.full_name AS created_by_name,
+                    p.title AS package_title
                FROM bookings b
                LEFT JOIN quotations q  ON q.id  = b.quotation_id AND q.company_id = b.company_id
                LEFT JOIN quotations pq ON pq.id = q.parent_quotation_id AND pq.company_id = b.company_id
                LEFT JOIN destinations d ON d.id = q.destination_id AND d.company_id = b.company_id
                LEFT JOIN staff_users  su ON su.id = b.created_by AND su.company_id = b.company_id
+               LEFT JOIN packages     p  ON p.id  = b.package_id AND p.company_id = b.company_id
               WHERE b.id = ? AND b.company_id = ?`, [req.params.id, req.companyId]
         );
         const b = rows[0];
@@ -150,14 +154,14 @@ const createBooking = async (req, res, next) => {
 
         const [bResult] = await conn.query(`
             INSERT INTO bookings (
-                booking_number, quotation_id, customer_name, customer_phone, customer_email,
+                booking_number, quotation_id, package_id, customer_name, customer_phone, customer_email,
                 destination_text, trip_start_date, trip_end_date, adults,
                 children_below_5, children_above_5, total_amount,
                 booking_fee_pct, booking_fee_amount, amount_paid, status, payment_status,
                 special_requests, internal_notes, created_by, company_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending','pending',?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending','pending',?,?,?,?)
         `, [
-            bookingNumber, quotation_id, q.customer_name, q.customer_phone, q.customer_email || null,
+            bookingNumber, quotation_id, q.package_id || null, q.customer_name, q.customer_phone, q.customer_email || null,
             q.destination_text, q.trip_start_date, q.trip_end_date, q.adults,
             q.children_below_5, q.children_above_5, q.grand_total,
             feePct, feeAmount, special_requests || null, internal_notes || null, req.user.id, req.companyId
@@ -216,4 +220,32 @@ const createBooking = async (req, res, next) => {
     }
 };
 
-module.exports = { listBookings, getBooking, updateStatus, createBooking };
+const getCalendarBookings = async (req, res, next) => {
+    try {
+        const { year, month } = req.query;
+        const y = parseInt(year) || new Date().getFullYear();
+        const m = parseInt(month) || (new Date().getMonth() + 1);
+        // Build date range: first day of month to last day of month
+        const startDate = `${y}-${String(m).padStart(2,'0')}-01`;
+        const nextMonth = m === 12 ? `${y+1}-01-01` : `${y}-${String(m+1).padStart(2,'0')}-01`;
+
+        const [rows] = await db.query(
+            `SELECT b.id, b.booking_number, b.customer_name, b.status, b.payment_status,
+                    b.trip_start_date, b.trip_end_date, b.total_amount, b.adults,
+                    b.destination_text, q.package_type,
+                    COALESCE(p.title, q.destination_text, b.destination_text) AS tour_title,
+                    COALESCE(p.category, q.package_type, 'Individual / Family') AS category
+               FROM bookings b
+               LEFT JOIN quotations q ON q.id = b.quotation_id AND q.company_id = b.company_id
+               LEFT JOIN packages p   ON p.id = b.package_id AND p.company_id = b.company_id
+              WHERE b.company_id = ?
+                AND b.status != 'cancelled'
+                AND b.trip_start_date >= ? AND b.trip_start_date < ?
+              ORDER BY b.trip_start_date ASC`,
+            [req.companyId, startDate, nextMonth]
+        );
+        res.json({ items: rows, year: y, month: m });
+    } catch (err) { next(err); }
+};
+
+module.exports = { listBookings, getBooking, updateStatus, createBooking, getCalendarBookings };

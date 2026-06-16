@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -116,6 +116,13 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
                     <div class="qtile-label">Invoices</div>
                 </div>
             </a>
+            <a routerLink="/calendar" class="qtile qtile-calendar">
+                <span class="qtile-icon">📅</span>
+                <div class="qtile-info">
+                    <div class="qtile-num">{{ upcomingDepartures() }}</div>
+                    <div class="qtile-label">Departures (30d)</div>
+                </div>
+            </a>
             <a routerLink="/reminders" class="qtile" [class]="{'qtile-danger': reminderStats()?.overdue > 0}">
                 <span class="qtile-icon">🔔</span>
                 <div class="qtile-info">
@@ -124,6 +131,128 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
                     @if (reminderStats()?.overdue > 0) { <small style="color:#b91c1c">🚨 {{ reminderStats()?.overdue }} overdue</small> }
                 </div>
             </a>
+        </div>
+
+        <!-- ── Revenue & Analytics Section ─────────────────── -->
+        <div class="analytics-grid">
+
+            <!-- Monthly Revenue Bar Chart -->
+            <div class="card chart-card">
+                <div class="section-header">
+                    <h2 style="margin:0;border:none;padding:0">📈 Monthly Revenue</h2>
+                    <a routerLink="/reports" class="btn btn-sm btn-outline">Full Reports</a>
+                </div>
+                @if (monthlyRevenue().length > 0) {
+                    <div class="bar-chart-wrap">
+                        <div class="bar-chart">
+                            @for (item of monthlyRevenue(); track item.month) {
+                                <div class="bar-col" [title]="'₹' + (item.revenue | number:'1.0-0')">
+                                    <div class="bar-fill" [style.height]="getBarHeight(item.revenue) + '%'"
+                                         [class.bar-peak]="item.revenue === maxRevenue()">
+                                        <span class="bar-val">₹{{ formatShort(item.revenue) }}</span>
+                                    </div>
+                                    <div class="bar-label">{{ formatMonth(item.month) }}</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                } @else {
+                    <div class="chart-empty">
+                        <div style="font-size:3rem">📊</div>
+                        <p>No booking revenue data yet.<br><a routerLink="/bookings">Create your first booking →</a></p>
+                    </div>
+                }
+            </div>
+
+            <!-- Pipeline Funnel + Lead Sources -->
+            <div class="card chart-card">
+                <h2 style="margin:0 0 16px; border:none; padding:0">🔀 Pipeline & Lead Sources</h2>
+                <!-- Pipeline funnel -->
+                <div class="funnel">
+                    <div class="funnel-step" style="--w:100%">
+                        <div class="funnel-bar" style="background: linear-gradient(90deg,#6366f1,#818cf8)">
+                            <span class="funnel-label">Leads</span>
+                            <span class="funnel-num">{{ leadStats()?.totals?.total || 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" [style.--w]="funnelWidth(quoteStats()?.total || 0, leadStats()?.totals?.total || 0)">
+                        <div class="funnel-bar" style="background: linear-gradient(90deg,#0ea5e9,#38bdf8)">
+                            <span class="funnel-label">Quotations</span>
+                            <span class="funnel-num">{{ quoteStats()?.total || 0 }}</span>
+                        </div>
+                    </div>
+                    <div class="funnel-step" [style.--w]="funnelWidth(bookingCount(), leadStats()?.totals?.total || 0)">
+                        <div class="funnel-bar" style="background: linear-gradient(90deg,#10b981,#34d399)">
+                            <span class="funnel-label">Bookings</span>
+                            <span class="funnel-num">{{ bookingCount() }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lead Sources -->
+                @if (leadSources().length > 0) {
+                    <div style="margin-top: 20px;">
+                        <h3 style="font-size:13px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:.06em; margin:0 0 10px">Lead Sources</h3>
+                        @for (src of leadSources(); track src.source) {
+                            <div class="source-row">
+                                <div class="source-dot" [style.background]="srcColor(src.source)"></div>
+                                <div class="source-name">{{ src.source | titlecase }}</div>
+                                <div class="source-bar-wrap">
+                                    <div class="source-bar" [style.width]="srcPct(src.count) + '%'" [style.background]="srcColor(src.source)"></div>
+                                </div>
+                                <div class="source-count">{{ src.count }}</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Top Destinations -->
+            @if (topDestinations().length > 0) {
+                <div class="card chart-card">
+                    <h2 style="margin:0 0 12px; border:none; padding:0">🗺️ Top Destinations</h2>
+                    <div class="table-wrap" style="box-shadow:none">
+                        <table class="data-table">
+                            <thead><tr><th>Destination</th><th class="num">Bookings</th><th class="num">Revenue</th></tr></thead>
+                            <tbody>
+                                @for (d of topDestinations().slice(0,8); track d.destination) {
+                                    <tr>
+                                        <td><strong>{{ d.destination }}</strong></td>
+                                        <td class="num">{{ d.bookings_count }}</td>
+                                        <td class="num" style="color:#10b981; font-weight:600">₹{{ d.total_sales | number:'1.0-0' }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            <!-- Agent Performance -->
+            @if (agentPerformance().length > 0) {
+                <div class="card chart-card">
+                    <h2 style="margin:0 0 12px; border:none; padding:0">👤 Agent Performance</h2>
+                    <div class="table-wrap" style="box-shadow:none">
+                        <table class="data-table">
+                            <thead><tr><th>Agent</th><th class="num">Bookings</th><th class="num">Revenue</th></tr></thead>
+                            <tbody>
+                                @for (a of agentPerformance(); track a.agent_name) {
+                                    <tr>
+                                        <td>
+                                            <div style="display:flex; align-items:center; gap:8px">
+                                                <span style="width:28px; height:28px; border-radius:50%; background: var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0">{{ a.agent_name[0] }}</span>
+                                                {{ a.agent_name }}
+                                            </div>
+                                        </td>
+                                        <td class="num">{{ a.bookings_count }}</td>
+                                        <td class="num" style="color:#4f46e5; font-weight:600">₹{{ a.total_sales | number:'1.0-0' }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
         </div>
 
         <!-- Today's Follow-ups -->
@@ -166,7 +295,7 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
             }
         </div>
 
-        <!-- Recent Leads -->
+        <!-- Recent Leads + Quotations -->
         <div class="dashboard-grid">
             <div class="card">
                 <div class="section-header">
@@ -255,6 +384,63 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
         .qtile-info { flex: 1; }
         .qtile-num { font-size: 1.4rem; font-weight: 700; color: #111827; }
         .qtile-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+        .qtile-calendar { border: 2px solid #e0e7ff; }
+
+        /* Analytics grid */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 18px; margin-bottom: 24px;
+        }
+        .chart-card { min-height: 200px; }
+
+        /* Bar chart */
+        .bar-chart-wrap { overflow-x: auto; padding-bottom: 4px; }
+        .bar-chart {
+            display: flex; align-items: flex-end; gap: 6px;
+            height: 160px; padding: 0 4px;
+            min-width: 300px;
+        }
+        .bar-col {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; height: 100%; justify-content: flex-end;
+        }
+        .bar-fill {
+            width: 100%; max-width: 36px;
+            background: linear-gradient(180deg, #6366f1 0%, #818cf8 100%);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+            position: relative;
+            transition: height .4s cubic-bezier(.4,0,.2,1);
+            display: flex; align-items: flex-start; justify-content: center;
+        }
+        .bar-fill.bar-peak { background: linear-gradient(180deg, #4f46e5 0%, #6366f1 100%); }
+        .bar-val {
+            font-size: 9px; font-weight: 700; color: #fff;
+            padding: 2px; text-align: center; white-space: nowrap;
+            position: absolute; top: -18px; color: #4f46e5;
+        }
+        .bar-label { font-size: 10px; color: #6b7280; margin-top: 4px; text-align: center; }
+        .chart-empty { text-align: center; padding: 32px; color: #6b7280; }
+
+        /* Funnel */
+        .funnel { display: flex; flex-direction: column; gap: 8px; }
+        .funnel-step { width: var(--w, 100%); transition: width .5s ease; }
+        .funnel-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; border-radius: 6px; color: #fff;
+        }
+        .funnel-label { font-size: 13px; font-weight: 600; }
+        .funnel-num { font-size: 18px; font-weight: 800; }
+
+        /* Lead Sources */
+        .source-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .source-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .source-name { font-size: 12px; font-weight: 500; min-width: 110px; color: #374151; text-transform: capitalize; }
+        .source-bar-wrap { flex: 1; height: 8px; background: #f3f4f6; border-radius: 4px; overflow: hidden; }
+        .source-bar { height: 100%; border-radius: 4px; transition: width .4s ease; }
+        .source-count { font-size: 12px; font-weight: 700; color: #374151; min-width: 28px; text-align: right; }
+
         .dashboard-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
             gap: 18px;
@@ -277,6 +463,7 @@ import { QuotationStats, QuotationListItem, LeadStats, Lead } from '../../core/m
         .st-lost      { background: #fee2e2; color: #991b1b; }
         @media (max-width: 600px) {
             .dashboard-grid { grid-template-columns: 1fr; }
+            .analytics-grid { grid-template-columns: 1fr; }
         }
     `]
 })
@@ -294,6 +481,16 @@ export class DashboardComponent implements OnInit {
     invoiceCount = signal(0);
     reminderStats = signal<any>(null);
     todayFollowups = signal<any[]>([]);
+    upcomingDepartures = signal(0);
+
+    // Analytics
+    monthlyRevenue = signal<{ month: string; revenue: number }[]>([]);
+    leadSources = signal<{ source: string; count: number }[]>([]);
+    topDestinations = signal<{ destination: string; bookings_count: number; total_sales: number }[]>([]);
+    agentPerformance = signal<{ agent_name: string; bookings_count: number; total_sales: number }[]>([]);
+
+    maxRevenue = computed(() => Math.max(...this.monthlyRevenue().map(r => r.revenue), 1));
+    maxLeadCount = computed(() => Math.max(...this.leadSources().map(s => s.count), 1));
 
     // Onboarding checklist
     destinationsCount = signal(0);
@@ -302,12 +499,47 @@ export class DashboardComponent implements OnInit {
     onboardingDismissed = signal(localStorage.getItem('dismiss_onboarding') === 'true');
 
     showOnboarding = computed(() => {
-        return !this.onboardingDismissed() && 
-            (this.destinationsCount() === 0 || 
-             this.hotelRatesCount() === 0 || 
-             !this.settingsCompleted() || 
+        return !this.onboardingDismissed() &&
+            (this.destinationsCount() === 0 ||
+             this.hotelRatesCount() === 0 ||
+             !this.settingsCompleted() ||
              (this.leadStats()?.totals?.total || 0) === 0);
     });
+
+    getBarHeight(revenue: number): number {
+        const max = this.maxRevenue();
+        return max > 0 ? Math.max(4, Math.round((revenue / max) * 100)) : 4;
+    }
+
+    formatShort(n: number): string {
+        if (n >= 100000) return `${(n / 100000).toFixed(1)}L`;
+        if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
+        return String(n);
+    }
+
+    formatMonth(month: string): string {
+        const [y, m] = month.split('-');
+        const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return names[parseInt(m) - 1] || month;
+    }
+
+    funnelWidth(count: number, total: number): string {
+        if (!total || total === 0) return '100%';
+        return Math.max(20, Math.round((count / total) * 100)) + '%';
+    }
+
+    srcPct(count: number): number {
+        return Math.max(4, Math.round((count / this.maxLeadCount()) * 100));
+    }
+
+    srcColor(source: string): string {
+        const map: Record<string, string> = {
+            meta_ads: '#f59e0b', whatsapp: '#22c55e', referral: '#10b981',
+            website_form: '#6366f1', walk_in: '#3b82f6', demo_request: '#14b8a6',
+            csv_upload: '#a855f7', phone: '#ec4899', email: '#f97316'
+        };
+        return map[source] || '#6b7280';
+    }
 
     dismissOnboarding() {
         localStorage.setItem('dismiss_onboarding', 'true');
@@ -322,53 +554,35 @@ export class DashboardComponent implements OnInit {
     }
 
     ngOnInit() {
-        // Load all data in parallel
         let done = 0;
-        const total = 10;
+        const total = 14;
         const check = () => { if (++done >= total) this.loading.set(false); };
 
-        this.api.stats().subscribe({
-            next: s => { this.quoteStats.set(s); check(); },
-            error: () => check()
-        });
-        this.api.listQuotations({ limit: 5 }).subscribe({
-            next: r => { this.recentQuotations.set(r.items); check(); },
-            error: () => check()
-        });
-        this.api.getLeadStats().subscribe({
-            next: s => { this.leadStats.set(s); check(); },
-            error: () => check()
-        });
-        this.api.listLeads({ limit: 5 }).subscribe({
-            next: r => { this.recentLeads.set(r.items); check(); },
-            error: () => check()
-        });
-        this.api.listBookings({ limit: 1 }).subscribe({
-            next: r => { this.bookingCount.set(r.total); check(); },
-            error: () => check()
-        });
-        this.api.listInvoices({ limit: 1 }).subscribe({
-            next: r => { this.invoiceCount.set(r.total); check(); },
-            error: () => check()
-        });
-        this.api.getReminderStats().subscribe({
-            next: r => { this.reminderStats.set(r); this.todayFollowups.set(r.todayList || []); check(); },
-            error: () => check()
-        });
-        this.api.listDestinations({ limit: 1 }).subscribe({
-            next: r => { this.destinationsCount.set(r.total || 0); check(); },
-            error: () => check()
-        });
-        this.api.listHotelRates({ limit: 1 }).subscribe({
-            next: r => { this.hotelRatesCount.set(r.total || 0); check(); },
-            error: () => check()
-        });
+        this.api.stats().subscribe({ next: s => { this.quoteStats.set(s); check(); }, error: () => check() });
+        this.api.listQuotations({ limit: 5 }).subscribe({ next: r => { this.recentQuotations.set(r.items); check(); }, error: () => check() });
+        this.api.getLeadStats().subscribe({ next: s => { this.leadStats.set(s); check(); }, error: () => check() });
+        this.api.listLeads({ limit: 5 }).subscribe({ next: r => { this.recentLeads.set(r.items); check(); }, error: () => check() });
+        this.api.listBookings({ limit: 1 }).subscribe({ next: r => { this.bookingCount.set(r.total); check(); }, error: () => check() });
+        this.api.listInvoices({ limit: 1 }).subscribe({ next: r => { this.invoiceCount.set(r.total); check(); }, error: () => check() });
+        this.api.getReminderStats().subscribe({ next: r => { this.reminderStats.set(r); this.todayFollowups.set(r.todayList || []); check(); }, error: () => check() });
+        this.api.listDestinations({ limit: 1 }).subscribe({ next: r => { this.destinationsCount.set(r.total || 0); check(); }, error: () => check() });
+        this.api.listHotelRates({ limit: 1 }).subscribe({ next: r => { this.hotelRatesCount.set(r.total || 0); check(); }, error: () => check() });
         this.api.getSettings().subscribe({
-            next: s => {
-                this.settingsCompleted.set(s && s.email && s.email !== 'bookings@sikkimtrails.demo' ? true : false);
-                check();
-            },
+            next: s => { this.settingsCompleted.set(s && s.email && s.email !== 'bookings@sikkimtrails.demo' ? true : false); check(); },
             error: () => check()
+        });
+
+        // Analytics
+        this.api.getMonthlyRevenue().subscribe({ next: d => { this.monthlyRevenue.set(d.slice(-12)); check(); }, error: () => check() });
+        this.api.getLeadSources().subscribe({ next: d => { this.leadSources.set(d.slice(0, 8)); check(); }, error: () => check() });
+        this.api.getSalesByDestination().subscribe({ next: d => { this.topDestinations.set(d); check(); }, error: () => check() });
+        this.api.getSalesByAgent().subscribe({ next: d => { this.agentPerformance.set(d); check(); }, error: () => check() });
+
+        // Upcoming departures (next 30 days)
+        const now = new Date();
+        this.api.getCalendarBookings(now.getFullYear(), now.getMonth() + 1).subscribe({
+            next: d => { this.upcomingDepartures.set(d.items.length); },
+            error: () => {}
         });
     }
 }

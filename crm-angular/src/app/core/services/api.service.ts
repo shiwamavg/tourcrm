@@ -12,7 +12,8 @@ import {
     Review, ReviewListResponse,
     Lead, LeadStatus, LeadSource, LeadListResponse, LeadStats,
     LeadConvertResponse, LeadBulkImportResponse,
-    StaffUser, UserListResponse, RoleRecord
+    StaffUser, UserListResponse, RoleRecord,
+    BookingTraveller
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -128,6 +129,30 @@ export class ApiService {
         return this.http.patch<AgencySettings>(`${this.base}/admin/settings`, body);
     }
 
+    // ── Predefined Packages ─────────────────────────────────
+    listPackages(params: { q?: string; is_active?: string | boolean; page?: number; limit?: number } = {}): Observable<{ items: any[]; total: number; page: number; limit: number }> {
+        let p = new HttpParams();
+        if (params.q) p = p.set('q', params.q);
+        if (params.is_active !== undefined) p = p.set('is_active', String(params.is_active));
+        if (params.page) p = p.set('page', String(params.page));
+        if (params.limit) p = p.set('limit', String(params.limit));
+        return this.http.get<{ items: any[]; total: number; page: number; limit: number }>(`${this.base}/packages/admin/all`, { params: p });
+    }
+    createPackage(body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/packages`, body);
+    }
+    updatePackage(id: number, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/packages/${id}`, body);
+    }
+    deletePackage(id: number): Observable<{ ok: boolean }> {
+        return this.http.delete<{ ok: boolean }>(`${this.base}/packages/${id}`);
+    }
+    uploadPackageImage(file: File): Observable<{ url: string }> {
+        const fd = new FormData();
+        fd.append('image', file);
+        return this.http.post<{ url: string }>(`${this.base}/packages/upload`, fd);
+    }
+
     // ── Bookings ───────────────────────────────────────────
     listBookings(params: { status?: BookingStatus; payment_status?: PaymentStatus; q?: string;
                            page?: number; limit?: number } = {}): Observable<BookingListResponse> {
@@ -139,6 +164,10 @@ export class ApiService {
         if (params.limit)         p = p.set('limit', String(params.limit));
         return this.http.get<BookingListResponse>(`${this.base}/admin/bookings`, { params: p });
     }
+    createBooking(body: { quotation_id: number; booking_fee_pct?: number; special_requests?: string; internal_notes?: string }): Observable<Booking> {
+        return this.http.post<Booking>(`${this.base}/admin/bookings`, body);
+    }
+
     getBooking(id: number | string): Observable<Booking> {
         return this.http.get<Booking>(`${this.base}/admin/bookings/${id}`);
     }
@@ -425,9 +454,41 @@ export class ApiService {
         return this.http.delete<{ ok: boolean }>(`${this.base}/booking-tasks/${id}`);
     }
 
+    // ── Booking Travellers ───────────────────────────────────────
+    listBookingTravellers(bookingId: number | string): Observable<BookingTraveller[]> {
+        return this.http.get<BookingTraveller[]>(`${this.base}/booking-travellers/${bookingId}`);
+    }
+    saveBookingTravellers(bookingId: number | string, travellers: Partial<BookingTraveller>[]): Observable<BookingTraveller[]> {
+        return this.http.put<BookingTraveller[]>(`${this.base}/booking-travellers/${bookingId}`, { travellers });
+    }
+
     // ── GST Reports ─────────────────────────────────────────────
     getGstReport(from: string, to: string): Observable<any> {
         let p = new HttpParams().set('from', from).set('to', to);
         return this.http.get<any>(`${this.base}/reports/gst`, { params: p });
     }
+
+    // ── Analytics Reports ────────────────────────────────────────
+    getMonthlyRevenue(): Observable<{ month: string; revenue: number }[]> {
+        return this.http.get<{ month: string; revenue: number }[]>(`${this.base}/reports/monthly-revenue`);
+    }
+    getLeadSources(): Observable<{ source: string; count: number }[]> {
+        return this.http.get<{ source: string; count: number }[]>(`${this.base}/reports/lead-sources`);
+    }
+    getSalesByDestination(): Observable<{ destination: string; bookings_count: number; total_sales: number }[]> {
+        return this.http.get<{ destination: string; bookings_count: number; total_sales: number }[]>(`${this.base}/reports/sales-by-destination`);
+    }
+    getSalesByAgent(): Observable<{ agent_name: string; bookings_count: number; total_sales: number }[]> {
+        return this.http.get<{ agent_name: string; bookings_count: number; total_sales: number }[]>(`${this.base}/reports/sales-by-agent`);
+    }
+    getPackagePerformance(): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/reports/package-performance`);
+    }
+
+    // ── Departure Calendar ───────────────────────────────────────
+    getCalendarBookings(year: number, month: number): Observable<{ items: any[]; year: number; month: number }> {
+        let p = new HttpParams().set('year', String(year)).set('month', String(month));
+        return this.http.get<{ items: any[]; year: number; month: number }>(`${this.base}/admin/bookings/calendar`, { params: p });
+    }
 }
+

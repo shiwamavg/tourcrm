@@ -191,7 +191,10 @@ export interface QuotationListItem {
     parent_quotation_id?: number;
     parent_quotation_number?: string;
     revision_note?: string;
+    valid_until?: string;
+    booking_id?: number;
 }
+
 
 export interface QuotationListResponse {
     items: QuotationListItem[];
@@ -270,6 +273,8 @@ export interface Booking {
     updated_at: string;
     created_by_name?: string;
     package_type?: string;
+    package_id?: number | null;
+    package_title?: string | null;
 }
 
 export interface BookingListItem {
@@ -289,6 +294,8 @@ export interface BookingListItem {
     payment_status: PaymentStatus;
     created_at: string;
     package_type?: string;
+    package_id?: number | null;
+    package_title?: string | null;
 }
 
 export interface BookingListResponse {
@@ -296,6 +303,15 @@ export interface BookingListResponse {
     total: number;
     page: number;
     limit: number;
+}
+
+export interface BookingTraveller {
+    id?: number;
+    booking_id: number;
+    full_name: string;
+    age?: number | null;
+    aadhar_number?: string | null;
+    traveller_type: 'adult' | 'child_below_5' | 'child_above_5';
 }
 
 // ────────────────────────────────────────────────────────────
@@ -436,11 +452,18 @@ export interface Lead {
     assigned_to_name?: string | null;
     follow_up_at?: string | null;
     notes?: string | null;
-    source_meta?: any;            // JSON: form fields, ad id, CSV row, etc.
+    source_meta?: any;
     created_by?: number | null;
     created_at: string;
     updated_at: string;
+    package_id?: number | null;
+    package_title?: string | null;
+    budget?: number | null;
+    travel_month?: string | null;
+    pax?: number | null;
+    tour_type?: string | null;
 }
+
 
 export type FollowupType = 'call' | 'email' | 'whatsapp' | 'meeting' | 'site_visit' | 'other';
 

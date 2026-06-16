@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -55,7 +55,16 @@ export class ReminderService {
     private http = inject(HttpClient);
     private base = 'http://localhost:3000/api/reminders';
 
-    list(): Observable<any[]> { return this.http.get<any[]>(this.base); }
+    list(params?: { status?: string; priority?: string; assigned_to?: number; today?: string; date_from?: string; date_to?: string }): Observable<any[]> {
+        let p = new HttpParams();
+        if (params?.status) p = p.set('status', params.status);
+        if (params?.priority) p = p.set('priority', params.priority);
+        if (params?.assigned_to) p = p.set('assigned_to', String(params.assigned_to));
+        if (params?.today) p = p.set('today', params.today);
+        if (params?.date_from) p = p.set('date_from', params.date_from);
+        if (params?.date_to) p = p.set('date_to', params.date_to);
+        return this.http.get<any[]>(this.base, { params: p });
+    }
     create(body: any): Observable<any> { return this.http.post(this.base, body); }
     update(id: number, body: any): Observable<any> { return this.http.patch(`${this.base}/${id}`, body); }
     dismiss(id: number): Observable<any> { return this.http.post(`${this.base}/${id}/dismiss`, {}); }
@@ -168,4 +177,5 @@ export class ReportsService {
     getSalesByDestination(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/sales-by-destination`); }
     getLeadSources(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/lead-sources`); }
     getMonthlyRevenue(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/monthly-revenue`); }
+    getPackagePerformance(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/package-performance`); }
 }

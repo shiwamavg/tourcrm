@@ -65,6 +65,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./features/bookings/booking-detail.component').then(m => m.BookingDetailComponent)
             },
             {
+                path: 'calendar',
+                loadComponent: () => import('./features/bookings/calendar.component').then(m => m.CalendarComponent)
+            },
+            {
                 path: 'payments',
                 loadComponent: () => import('./features/payments/payment-list.component').then(m => m.PaymentListComponent)
             },
@@ -79,6 +83,10 @@ export const routes: Routes = [
             {
                 path: 'admin/destinations',
                 loadComponent: () => import('./features/admin/destinations.component').then(m => m.DestinationsComponent)
+            },
+            {
+                path: 'admin/packages',
+                loadComponent: () => import('./features/admin/packages.component').then(m => m.PackagesComponent)
             },
             {
                 path: 'admin/hotel-rates',

@@ -87,7 +87,11 @@ import { BookingStatus, PaymentStatus } from '../../core/models';
                                     </small>
                                 </td>
                                 <td>
-                                    <span class="badge badge-draft">{{ formatPackage(b.package_type) }}</span>
+                                    @if (b.package_title) {
+                                        <strong style="color:#0f766e">{{ b.package_title }}</strong>
+                                    } @else {
+                                        <span class="badge badge-draft">{{ formatPackage(b.package_type) }}</span>
+                                    }
                                 </td>
                                 <td class="num">₹{{ b.total_amount | number:'1.0-0' }}</td>
                                 <td class="num">₹{{ b.amount_paid | number:'1.0-0' }}</td>

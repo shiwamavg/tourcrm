@@ -34,7 +34,7 @@ import { ToastService } from '../../core/services/toast.service';
             </select>
         </label>
         <div class="form-actions">
-            <button class="btn" (click)="save()" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Create' }}</button>
+            <button class="btn" (click)="save()" [disabled]="saving()">Save</button>
             <button class="btn ghost" (click)="showForm.set(false)">Cancel</button>
         </div>
     </div>
@@ -64,7 +64,7 @@ import { ToastService } from '../../core/services/toast.service';
         h1 { margin:0 0 14px; font-size:1.3rem; }
         .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; }
         .btn.ghost { background:#f3f4f6; color:#374151; }
-        .btn.small { padding:4px 8px; font-size:12px; }
+        .btn.small { padding:4px 8px; font-size:12px; background:#0f766e; color:#fff; }
         .btn.warn { background:#b91c1c; }
         .form-panel { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:14px; margin-bottom:14px; max-width:540px; }
         .form-panel label { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; font-size:12px; color:#374151; }

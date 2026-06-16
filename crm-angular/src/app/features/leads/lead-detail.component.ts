@@ -63,6 +63,9 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                         <tr><th>Phone</th><td>{{ l.phone }}</td></tr>
                         <tr><th>Email</th><td>{{ l.email || '—' }}</td></tr>
                         <tr><th>Destination</th><td>{{ l.destination_text || '—' }}</td></tr>
+                        @if (l.package_title) {
+                            <tr><th>Package</th><td><strong>{{ l.package_title }}</strong></td></tr>
+                        }
                         <tr><th>Assigned to</th>
                             <td>
                                 <select [ngModel]="l.assigned_to" (change)="assign($event)">
