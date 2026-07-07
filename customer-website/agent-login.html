@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Agent Portal — TourCRM</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <link rel="stylesheet" href="css/marketing.css">
+    <script>
+        window.API_BASE = 'http://localhost:3000';
+    </script>
+    <style>
+        .portal-nav { background: #fff; border-bottom: 1px solid var(--gray-200); }
+        .portal-nav .container { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+        .portal-nav .brand { color: var(--gray-900); }
+        .portal-nav nav a { color: var(--gray-700); font-size: 14px; margin-left: 18px; }
+        .portal-wrap { max-width: 420px; margin: 60px auto; }
+        .portal-box { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 28px; box-shadow: var(--shadow-lg); }
+    </style>
+</head>
+<body>
+
+<header class="portal-nav">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <span class="logo">🏔️</span>
+            <span>TourCRM</span>
+        </a>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="portal.html">Customer Login</a>
+        </nav>
+    </div>
+</header>
+
+<main class="portal-wrap">
+    <div class="portal-box">
+        <h1>🤝 B2B Agent Portal</h1>
+        <p class="hero">Sign in to submit trips, monitor client requests, and manage your commissions.</p>
+
+        <div data-alert style="display:none"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email <span class="req">*</span></label>
+                <input id="email" type="email" required placeholder="agent@example.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password <span class="req">*</span></label>
+                <input id="password" type="password" required placeholder="••••••••" autocomplete="current-password">
+            </div>
+            <button class="btn btn-primary btn-block" id="loginBtn" type="submit">
+                🔓 Sign in
+            </button>
+        </form>
+
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:18px 0">
+        <p class="muted" style="text-align:center">
+            Want to partner with us? <br>
+            <a href="agent-signup.html" style="font-weight:600">Register as a B2B Agent</a>
+        </p>
+    </div>
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>TourCRM</h4>
+                <p>CRM software for tour & travel agencies</p>
+                <p>✉ support@tourcrm.example.com</p>
+            </div>
+            <div>
+                <h4>Quick links</h4>
+                <p><a href="index.html">Home</a></p>
+                <p><a href="portal.html">Customer Portal</a></p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> TourCRM. All rights reserved.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/agent.js"></script>
+<script>
+    if (AgentAuth.token) {
+        location.replace('agent-dashboard.html');
+    }
+
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('loginBtn');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Signing in…';
+        showAlert('success', 'Verifying credentials...');
+
+        try {
+            const r = await API.agentLogin(email, password);
+            AgentAuth.session(r.access_token, r.agent);
+            showAlert('success', 'Logged in successfully. Redirecting...');
+            setTimeout(() => {
+                location.replace('agent-dashboard.html');
+            }, 800);
+        } catch (err) {
+            showAlert('error', err.message || 'Failed to login');
+            btn.disabled = false;
+            btn.innerHTML = '🔓 Sign in';
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -258,7 +258,27 @@ const reviewBooking = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+const myReferrals = async (req, res, next) => {
+    try {
+        const email = req.portal.email;
+        const [rows] = await db.query(
+            `SELECT c.id, c.amount, c.status, c.paid_at, c.payment_reference,
+                    rb.booking_number AS referrer_booking_number,
+                    b.booking_number AS referred_booking_number,
+                    b.customer_name AS referred_customer_name,
+                    p.title AS package_title
+               FROM commissions c
+               JOIN bookings rb ON rb.id = c.referrer_booking_id AND rb.company_id = c.company_id
+               JOIN bookings b ON b.id = c.booking_id AND b.company_id = c.company_id
+               LEFT JOIN packages p ON p.id = b.package_id AND p.company_id = b.company_id
+              WHERE rb.customer_email = ?
+              ORDER BY c.id DESC`, [email]
+        );
+        res.json({ items: rows });
+    } catch (err) { next(err); }
+};
+
 module.exports = {
     sendOtp, verifyOtp, portalAuth, me,
-    myBookings, bookingDetail, payBooking, payOffline, reviewBooking
+    myBookings, bookingDetail, payBooking, payOffline, reviewBooking, myReferrals
 };

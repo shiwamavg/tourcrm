@@ -16,6 +16,7 @@ import { HotelRateModalComponent } from '../../shared/components/hotel-rate-moda
 import { CarRateModalComponent } from '../../shared/components/car-rate-modal.component';
 import { DestinationModalComponent } from '../../shared/components/destination-modal.component';
 import { DaywiseItineraryComponent } from './daywise-itinerary.component';
+import { CurrencyService } from '../../core/services/competitor-features.service';
 
 type PackageType =
     | 'hotel' | 'car' | 'flight'
@@ -32,7 +33,7 @@ type PackageType =
             <p>Step {{ visibleStepNum() }} of {{ visibleSteps().length }} — {{ stepLabel() }}</p>
         </div>
         <div>
-            <span class="info-badge">Live total: ₹{{ totals().grandTotal | number:'1.0-0' }}</span>
+            <span class="info-badge">Live total: {{ getBillingCurrencySymbol() }}{{ totals().grandTotal | number:'1.0-0' }}</span>
         </div>
     </div>
 
@@ -57,6 +58,16 @@ type PackageType =
         @if (currentStep() === 1) {
         <div class="card">
             <h2>Customer & Trip Details</h2>
+            <div class="form-group" style="margin-bottom: 1.5rem; background: var(--gray-50); padding: 1rem; border-radius: 6px;">
+                <label style="font-weight: 600; color: var(--primary);">Quick Start: Select a Predefined Package (Optional)</label>
+                <select (change)="onPackageSelect($event)" class="master-select">
+                    <option value="">— Start from scratch —</option>
+                    @for (p of predefinedPackages(); track p.id) {
+                        <option [value]="p.id">{{ p.title }} ({{ p.duration_days }} Days) — ₹{{ p.price | number:'1.0-0' }} / person</option>
+                    }
+                </select>
+                <p class="text-xs mt-1 text-gray-500">Selecting a package will auto-fill hotels, transport, itinerary, and add a lumped "Package Base Price" charge.</p>
+            </div>
             <div class="form-grid-2">
                 <div class="form-group">
                     <label>Customer Name <span class="req">*</span></label>
@@ -132,6 +143,14 @@ type PackageType =
                 <div class="form-group">
                     <label>Children above 5</label>
                     <input type="number" formControlName="children_above_5" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Billing Currency</label>
+                    <select formControlName="billing_currency" (change)="onBillingCurrencyChange()">
+                        @for (curr of currenciesList(); track curr.code) {
+                            <option [value]="curr.code">{{ curr.code }} ({{ curr.symbol }}) — Rate: {{ curr.exchange_rate }}</option>
+                        }
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Number of Rooms</label>
@@ -214,9 +233,19 @@ type PackageType =
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Charge / Night (₹) <span class="req">*</span></label>
-                                <input type="number" formControlName="charge_per_night" min="0" step="1"
-                                       [class.invalid]="isInvalid(h.get('charge_per_night'))">
+                                <label>Charge / Night <span class="req">*</span></label>
+                                <div class="flex gap-2">
+                                    <select formControlName="currency_code" style="max-width:80px" (change)="onLineCurrencyChange(i, 'hotel')">
+                                        @for (curr of currenciesList(); track curr.code) {
+                                            <option [value]="curr.code">{{ curr.code }}</option>
+                                        }
+                                    </select>
+                                    <input type="number" formControlName="charge_per_night" min="0" step="1" style="flex:1"
+                                           [class.invalid]="isInvalid(h.get('charge_per_night'))">
+                                </div>
+                                @if (h.get('currency_code')?.value !== form.get('billing_currency')?.value) {
+                                    <small class="text-muted" style="display:block;margin-top:2px">≈ {{ getBillingCurrencySymbol() }}{{ getConvertedLineTotalLabel(h) }} / night</small>
+                                }
                                 @if (isInvalid(h.get('charge_per_night'))) {
                                     <span class="field-error">{{ errorMsg(h.get('charge_per_night')) }}</span>
                                 }
@@ -252,7 +281,7 @@ type PackageType =
                             </div>
                         </div>
                         <div class="line-total">
-                            Hotel {{ i + 1 }} total: ₹{{ hotelLineTotal(i) | number:'1.0-0' }}
+                            Hotel {{ i + 1 }} total: {{ getBillingCurrencySymbol() }}{{ hotelLineTotal(i) | number:'1.0-0' }}
                         </div>
                     </div>
                 }
@@ -319,9 +348,19 @@ type PackageType =
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Charge / Day (₹) <span class="req">*</span></label>
-                                <input type="number" formControlName="charge_per_day" min="0" step="1"
-                                       [class.invalid]="isInvalid(c.get('charge_per_day'))">
+                                <label>Charge / Day <span class="req">*</span></label>
+                                <div class="flex gap-2">
+                                    <select formControlName="currency_code" style="max-width:80px" (change)="onLineCurrencyChange(i, 'car')">
+                                        @for (curr of currenciesList(); track curr.code) {
+                                            <option [value]="curr.code">{{ curr.code }}</option>
+                                        }
+                                    </select>
+                                    <input type="number" formControlName="charge_per_day" min="0" step="1" style="flex:1"
+                                           [class.invalid]="isInvalid(c.get('charge_per_day'))">
+                                </div>
+                                @if (c.get('currency_code')?.value !== form.get('billing_currency')?.value) {
+                                    <small class="text-muted" style="display:block;margin-top:2px">≈ {{ getBillingCurrencySymbol() }}{{ getConvertedLineTotalLabel(c) }} / day</small>
+                                }
                                 @if (isInvalid(c.get('charge_per_day'))) {
                                     <span class="field-error">{{ errorMsg(c.get('charge_per_day')) }}</span>
                                 }
@@ -348,7 +387,7 @@ type PackageType =
                             </div>
                         </div>
                         <div class="line-total">
-                            Car {{ i + 1 }} total: ₹{{ carLineTotal(i) | number:'1.0-0' }}
+                            Car {{ i + 1 }} total: {{ getBillingCurrencySymbol() }}{{ carLineTotal(i) | number:'1.0-0' }}
                         </div>
                     </div>
                 }
@@ -404,7 +443,7 @@ type PackageType =
                             </div>
                         </div>
                         <div class="line-total">
-                            Flight {{ i + 1 }} total: ₹{{ flightLineTotal(i) | number:'1.0-0' }}
+                            Flight {{ i + 1 }} total: {{ getBillingCurrencySymbol() }}{{ flightLineTotal(i) | number:'1.0-0' }}
                         </div>
                     </div>
                 }
@@ -553,29 +592,29 @@ type PackageType =
 
             <div class="summary-table mt-4">
                 @if (totals().hotelTotal > 0) {
-                    <div class="summary-row"><span>Hotels total</span><span>₹{{ totals().hotelTotal | number:'1.0-0' }}</span></div>
+                    <div class="summary-row"><span>Hotels total</span><span>{{ getBillingCurrencySymbol() }}{{ totals().hotelTotal | number:'1.0-0' }}</span></div>
                 }
                 @if (totals().carTotal > 0) {
-                    <div class="summary-row"><span>Transport total</span><span>₹{{ totals().carTotal | number:'1.0-0' }}</span></div>
+                    <div class="summary-row"><span>Transport total</span><span>{{ getBillingCurrencySymbol() }}{{ totals().carTotal | number:'1.0-0' }}</span></div>
                 }
                 @if (totals().flightTotal > 0) {
-                    <div class="summary-row"><span>Flights total</span><span>₹{{ totals().flightTotal | number:'1.0-0' }}</span></div>
+                    <div class="summary-row"><span>Flights total</span><span>{{ getBillingCurrencySymbol() }}{{ totals().flightTotal | number:'1.0-0' }}</span></div>
                 }
                 @if (totals().miscTotal > 0) {
-                    <div class="summary-row"><span>Miscellaneous</span><span>₹{{ totals().miscTotal | number:'1.0-0' }}</span></div>
+                    <div class="summary-row"><span>Miscellaneous</span><span>{{ getBillingCurrencySymbol() }}{{ totals().miscTotal | number:'1.0-0' }}</span></div>
                 }
-                <div class="summary-row subtotal"><span>Subtotal</span><span>₹{{ totals().subtotal | number:'1.0-0' }}</span></div>
+                <div class="summary-row subtotal"><span>Subtotal</span><span>{{ getBillingCurrencySymbol() }}{{ totals().subtotal | number:'1.0-0' }}</span></div>
                 <div class="summary-row">
                     <span>Markup ({{ form.value.markup_pct || 0 }}%)</span>
-                    <span>₹{{ totals().markupAmount | number:'1.0-0' }}</span>
+                    <span>{{ getBillingCurrencySymbol() }}{{ totals().markupAmount | number:'1.0-0' }}</span>
                 </div>
                 <div class="summary-row">
                     <span>GST ({{ form.value.gst_pct || 0 }}%)</span>
-                    <span>₹{{ totals().gstAmount | number:'1.0-0' }}</span>
+                    <span>{{ getBillingCurrencySymbol() }}{{ totals().gstAmount | number:'1.0-0' }}</span>
                 </div>
                 <div class="summary-row grand-total">
                     <span>Grand Total</span>
-                    <span>₹{{ totals().grandTotal | number:'1.0-0' }}</span>
+                    <span>{{ getBillingCurrencySymbol() }}{{ totals().grandTotal | number:'1.0-0' }}</span>
                 </div>
             </div>
 
@@ -633,8 +672,11 @@ export class QuotationBuilderComponent implements OnInit {
     private api = inject(ApiService);
     private router = inject(Router);
     private route = inject(ActivatedRoute);
+    private currencyService = inject(CurrencyService);
     editId = signal<number | null>(null);
     loading = signal(false);
+
+    currenciesList = signal<any[]>([]);
 
     currentStep = signal(1);
     saving = signal(false);
@@ -644,6 +686,7 @@ export class QuotationBuilderComponent implements OnInit {
     showDestinationModal = signal(false);
 
     destinations = signal<Destination[]>([]);
+    predefinedPackages = signal<any[]>([]);
     hotelMasterRates = signal<HotelRate[]>([]);
     carMasterRates = signal<CarRate[]>([]);
 
@@ -673,6 +716,7 @@ export class QuotationBuilderComponent implements OnInit {
         customer_name:  ['', Validators.required],
         customer_phone: ['', [Validators.required, Validators.minLength(7)]],
         customer_email: [''],
+        package_id: [null],
         destination_id: [null],
         destination_text: [''],
         trip_start_date: ['', Validators.required],
@@ -687,6 +731,8 @@ export class QuotationBuilderComponent implements OnInit {
         valid_till:       [''],
         terms_notes:      [''],
         internal_notes:   [''],
+        billing_currency: ['INR'],
+        exchange_rate:    [1.000000],
         hotels:  this.fb.array([this.newHotel()]),
         cars:    this.fb.array([this.newCar()]),
         flights: this.fb.array([this.newFlight()]),
@@ -718,6 +764,32 @@ export class QuotationBuilderComponent implements OnInit {
             next: d => this.destinations.set(d.items),
             error: () => this.error.set('Failed to load destinations. Make sure admin has added some.')
         });
+        this.api.getPackagesAdmin().subscribe({
+            next: (res: any) => this.predefinedPackages.set(res.items || [])
+        });
+
+        this.currencyService.list().subscribe({
+            next: list => {
+                if (list.length === 0) {
+                    this.currenciesList.set([
+                        { code: 'INR', symbol: '₹', exchange_rate: 1 },
+                        { code: 'USD', symbol: '$', exchange_rate: 83.5 },
+                        { code: 'EUR', symbol: '€', exchange_rate: 90 },
+                        { code: 'AED', symbol: 'AED', exchange_rate: 22.7 }
+                    ]);
+                } else {
+                    this.currenciesList.set(list);
+                }
+            },
+            error: () => {
+                this.currenciesList.set([
+                    { code: 'INR', symbol: '₹', exchange_rate: 1 },
+                    { code: 'USD', symbol: '$', exchange_rate: 83.5 },
+                    { code: 'EUR', symbol: '€', exchange_rate: 90 },
+                    { code: 'AED', symbol: 'AED', exchange_rate: 22.7 }
+                ]);
+            }
+        });
 
         const editIdParam = this.route.snapshot.paramMap.get('id');
         if (editIdParam && this.router.url.includes('/edit')) {
@@ -742,7 +814,9 @@ export class QuotationBuilderComponent implements OnInit {
                         gst_pct: q.gst_pct,
                         valid_till: q.valid_till ? q.valid_till.substring(0, 10) : '',
                         terms_notes: q.terms_notes || '',
-                        internal_notes: q.internal_notes || ''
+                        internal_notes: q.internal_notes || '',
+                        billing_currency: q.billing_currency || 'INR',
+                        exchange_rate: Number(q.exchange_rate || 1.0)
                     });
                     this.syncNights();
 
@@ -755,11 +829,14 @@ export class QuotationBuilderComponent implements OnInit {
                             star_rating: [h.star_rating ? Number(h.star_rating) : null],
                             room_type: [h.room_type || 'deluxe'],
                             meal_plan: [h.meal_plan || 'breakfast'],
-                            charge_per_night: [h.charge_per_night, [Validators.required, Validators.min(0)]],
+                            charge_per_night: [h.original_rate != null ? Number(h.original_rate) : Number(h.charge_per_night), [Validators.required, Validators.min(0)]],
                             num_nights: [h.num_nights, [Validators.required, Validators.min(1)]],
                             num_rooms: [h.num_rooms || 1, [Validators.min(1)]],
                             special_charges: [h.special_charges || 0],
-                            special_charges_note: [h.special_charges_note || '']
+                            special_charges_note: [h.special_charges_note || ''],
+                            currency_code: [h.currency_code || 'INR'],
+                            exchange_rate: [Number(h.exchange_rate || 1.0)],
+                            original_rate: [h.original_rate || null]
                         }));
                     });
                     if (this.hotelsArray.length === 0) this.hotelsArray.push(this.newHotel());
@@ -771,11 +848,14 @@ export class QuotationBuilderComponent implements OnInit {
                             car_rate_id: [c.car_rate_id || null],
                             car_type_name: [c.car_type_name, Validators.required],
                             car_class: [c.car_class || 'standard'],
-                            charge_per_day: [c.charge_per_day, [Validators.required, Validators.min(0)]],
+                            charge_per_day: [c.original_rate != null ? Number(c.original_rate) : Number(c.charge_per_day), [Validators.required, Validators.min(0)]],
                             num_days: [c.num_days, [Validators.required, Validators.min(1)]],
                             km_limit_per_day: [c.km_limit_per_day || 250],
                             extra_charge_per_km: [c.extra_charge_per_km || 0],
-                            estimated_extra_km: [c.estimated_extra_km || 0]
+                            estimated_extra_km: [c.estimated_extra_km || 0],
+                            currency_code: [c.currency_code || 'INR'],
+                            exchange_rate: [Number(c.exchange_rate || 1.0)],
+                            original_rate: [c.original_rate || null]
                         }));
                     });
                     if (this.carsArray.length === 0) this.carsArray.push(this.newCar());
@@ -848,7 +928,9 @@ export class QuotationBuilderComponent implements OnInit {
 
     visibleSteps = computed(() => {
         const pkg = (this.formValue()?.package_type as string) || '';
+        const isPredefined = !!(this.formValue()?.package_id);
         return this.allSteps.filter(s => {
+            if (isPredefined && s.num > 1 && s.num < 7) return false;
             if (s.num === 2) return pkg.includes('hotel');
             if (s.num === 3) return pkg.includes('car');
             if (s.num === 4) return pkg.includes('flight');
@@ -885,13 +967,17 @@ export class QuotationBuilderComponent implements OnInit {
     // ── Per-line totals (used in line card + summary) ───
     hotelLineTotal(i: number): number {
         const h = this.hotelsArray.at(i).value as any;
-        return (Number(h.charge_per_night) || 0) * (Number(h.num_nights) || 0) * (Number(h.num_rooms) || 1)
-             + (Number(h.special_charges) || 0);
+        const rate = this.convertToBilling(h.charge_per_night, h.currency_code, h.exchange_rate);
+        const spec = this.convertToBilling(h.special_charges, h.currency_code, h.exchange_rate);
+        return (Number(rate) || 0) * (Number(h.num_nights) || 0) * (Number(h.num_rooms) || 1)
+             + (Number(spec) || 0);
     }
     carLineTotal(i: number): number {
         const c = this.carsArray.at(i).value as any;
-        return (Number(c.charge_per_day) || 0) * (Number(c.num_days) || 0)
-             + (Number(c.estimated_extra_km) || 0) * (Number(c.extra_charge_per_km) || 0);
+        const rate = this.convertToBilling(c.charge_per_day, c.currency_code, c.exchange_rate);
+        const extra = this.convertToBilling(c.extra_charge_per_km, c.currency_code, c.exchange_rate);
+        return (Number(rate) || 0) * (Number(c.num_days) || 0)
+             + (Number(c.estimated_extra_km) || 0) * (Number(extra) || 0);
     }
     flightLineTotal(i: number): number {
         const f = this.flightsArray.at(i).value as any;
@@ -899,6 +985,50 @@ export class QuotationBuilderComponent implements OnInit {
         const children = Number(this.form.value.children_above_5) || 0;
         return (Number(f.fare_per_adult) || 0) * adults
              + (Number(f.fare_per_child) || 0) * children;
+    }
+
+    convertToBilling(amount: number, itemCurrency: string, itemRate: number): number {
+        const billingCurr = this.form.get('billing_currency')?.value || 'INR';
+        const billingRate = Number(this.form.get('exchange_rate')?.value || 1.0);
+
+        if (itemCurrency === billingCurr) {
+            return Number(amount) || 0;
+        }
+        return ((Number(amount) || 0) * (Number(itemRate) || 1.0)) / (Number(billingRate) || 1.0);
+    }
+
+    getBillingCurrencySymbol(): string {
+        const code = this.form.get('billing_currency')?.value || 'INR';
+        const curr = this.currenciesList().find(c => c.code === code);
+        return curr ? curr.symbol : '₹';
+    }
+
+    getConvertedLineTotalLabel(control: AbstractControl): string {
+        const rateVal = Number(control.get('charge_per_night')?.value || control.get('charge_per_day')?.value || 0);
+        const itemCurr = control.get('currency_code')?.value || 'INR';
+        const itemRate = Number(control.get('exchange_rate')?.value || 1.0);
+        const converted = this.convertToBilling(rateVal, itemCurr, itemRate);
+        return converted.toFixed(0);
+    }
+
+    onBillingCurrencyChange() {
+        const code = this.form.get('billing_currency')?.value;
+        const curr = this.currenciesList().find(c => c.code === code);
+        if (curr) {
+            this.form.patchValue({ exchange_rate: curr.exchange_rate });
+        }
+        this.recalcTotals();
+    }
+
+    onLineCurrencyChange(index: number, type: 'hotel' | 'car') {
+        const array = type === 'hotel' ? this.hotelsArray : this.carsArray;
+        const grp = array.at(index);
+        const code = grp.get('currency_code')?.value;
+        const curr = this.currenciesList().find(c => c.code === code);
+        if (curr) {
+            grp.patchValue({ exchange_rate: curr.exchange_rate });
+        }
+        this.recalcTotals();
     }
 
     private recalcTotals() {
@@ -1058,7 +1188,10 @@ export class QuotationBuilderComponent implements OnInit {
             charge_per_night:  r.charge_per_night,
             num_nights:        this.nights() || 1,
             num_rooms:         1,
-            special_charges:   0
+            special_charges:   0,
+            currency_code:     'INR',
+            exchange_rate:     1.000000,
+            original_rate:     null
         };
     }
     private carPatchFromMaster(r: CarRate) {
@@ -1070,7 +1203,10 @@ export class QuotationBuilderComponent implements OnInit {
             num_days:            this.nights() || 1,
             km_limit_per_day:    r.km_limit_per_day,
             extra_charge_per_km: r.extra_charge_per_km,
-            estimated_extra_km:  0
+            estimated_extra_km:  0,
+            currency_code:       'INR',
+            exchange_rate:       1.000000,
+            original_rate:       null
         };
     }
 
@@ -1098,7 +1234,10 @@ export class QuotationBuilderComponent implements OnInit {
             num_nights:           [1, [Validators.required, Validators.min(1)]],
             num_rooms:            [1,  [Validators.min(1)]],
             special_charges:      [0],
-            special_charges_note: ['']
+            special_charges_note: [''],
+            currency_code:        ['INR'],
+            exchange_rate:        [1.0],
+            original_rate:        [null]
         });
     }
     newCar() {
@@ -1110,7 +1249,10 @@ export class QuotationBuilderComponent implements OnInit {
             num_days:            [1, [Validators.required, Validators.min(1)]],
             km_limit_per_day:    [250],
             extra_charge_per_km: [0],
-            estimated_extra_km:  [0]
+            estimated_extra_km:  [0],
+            currency_code:       ['INR'],
+            exchange_rate:       [1.0],
+            original_rate:       [null]
         });
     }
     newFlight() {
@@ -1137,13 +1279,34 @@ export class QuotationBuilderComponent implements OnInit {
     continueStep() {
         this.error.set(null);
         this.saving.set(true);
+
+        const rawForm = this.form.value;
+        const hotels = (rawForm.hotels || []).map((h: any) => {
+            const hasForeign = h.currency_code !== rawForm.billing_currency;
+            return {
+                ...h,
+                original_rate: hasForeign ? Number(h.charge_per_night) : null,
+                charge_per_night: hasForeign ? this.convertToBilling(h.charge_per_night, h.currency_code, h.exchange_rate) : h.charge_per_night,
+                special_charges: hasForeign ? this.convertToBilling(h.special_charges, h.currency_code, h.exchange_rate) : h.special_charges
+            };
+        });
+        const cars = (rawForm.cars || []).map((c: any) => {
+            const hasForeign = c.currency_code !== rawForm.billing_currency;
+            return {
+                ...c,
+                original_rate: hasForeign ? Number(c.charge_per_day) : null,
+                charge_per_day: hasForeign ? this.convertToBilling(c.charge_per_day, c.currency_code, c.exchange_rate) : c.charge_per_day,
+                extra_charge_per_km: hasForeign ? this.convertToBilling(c.extra_charge_per_km, c.currency_code, c.exchange_rate) : c.extra_charge_per_km
+            };
+        });
+
         const payload = {
-            ...this.form.value,
+            ...rawForm,
             status: 'draft' as const,
-            hotels:  (this.form.value.hotels  || []).filter((h: any) => h.hotel_name),
-            cars:    (this.form.value.cars    || []).filter((c: any) => c.car_type_name),
-            flights: (this.form.value.flights || []).filter((f: any) => f.airline || f.route),
-            misc:    (this.form.value.misc    || []).filter((m: any) => m.label),
+            hotels:  hotels.filter((h: any) => h.hotel_name),
+            cars:    cars.filter((c: any) => c.car_type_name),
+            flights: (rawForm.flights || []).filter((f: any) => f.airline || f.route),
+            misc:    (rawForm.misc || []).filter((m: any) => m.label),
             daywise_itinerary: this.builderDays()
         };
         const obs = this.editId()
@@ -1166,18 +1329,28 @@ export class QuotationBuilderComponent implements OnInit {
     // ── Step navigation (skips irrelevant steps) ────────
     nextStep() {
         const pkg = this.form.value.package_type || '';
+        const isPredefined = !!this.form.value.package_id;
         let n = this.currentStep() + 1;
-        if (n === 2 && !pkg.includes('hotel')) n = 3;
-        if (n === 3 && !pkg.includes('car'))   n = 4;
-        if (n === 4 && !pkg.includes('flight')) n = 5;
+        if (isPredefined && this.currentStep() === 1) {
+            n = 7;
+        } else {
+            if (n === 2 && !pkg.includes('hotel')) n = 3;
+            if (n === 3 && !pkg.includes('car'))   n = 4;
+            if (n === 4 && !pkg.includes('flight')) n = 5;
+        }
         this.currentStep.set(Math.min(7, n));
     }
     prevStep() {
         const pkg = this.form.value.package_type || '';
+        const isPredefined = !!this.form.value.package_id;
         let p = this.currentStep() - 1;
-        if (p === 4 && !pkg.includes('flight')) p = 3;
-        if (p === 3 && !pkg.includes('car'))    p = 2;
-        if (p === 2 && !pkg.includes('hotel'))  p = 1;
+        if (isPredefined && this.currentStep() === 7) {
+            p = 1;
+        } else {
+            if (p === 4 && !pkg.includes('flight')) p = 3;
+            if (p === 3 && !pkg.includes('car'))    p = 2;
+            if (p === 2 && !pkg.includes('hotel'))  p = 1;
+        }
         this.currentStep.set(Math.max(1, p));
     }
 
@@ -1195,14 +1368,34 @@ export class QuotationBuilderComponent implements OnInit {
         }
         this.error.set(null);
         this.saving.set(true);
+
+        const rawForm = this.form.value;
+        const hotels = (rawForm.hotels || []).map((h: any) => {
+            const hasForeign = h.currency_code !== rawForm.billing_currency;
+            return {
+                ...h,
+                original_rate: hasForeign ? Number(h.charge_per_night) : null,
+                charge_per_night: hasForeign ? this.convertToBilling(h.charge_per_night, h.currency_code, h.exchange_rate) : h.charge_per_night,
+                special_charges: hasForeign ? this.convertToBilling(h.special_charges, h.currency_code, h.exchange_rate) : h.special_charges
+            };
+        });
+        const cars = (rawForm.cars || []).map((c: any) => {
+            const hasForeign = c.currency_code !== rawForm.billing_currency;
+            return {
+                ...c,
+                original_rate: hasForeign ? Number(c.charge_per_day) : null,
+                charge_per_day: hasForeign ? this.convertToBilling(c.charge_per_day, c.currency_code, c.exchange_rate) : c.charge_per_day,
+                extra_charge_per_km: hasForeign ? this.convertToBilling(c.extra_charge_per_km, c.currency_code, c.exchange_rate) : c.extra_charge_per_km
+            };
+        });
+
         const payload = {
-            ...this.form.value,
+            ...rawForm,
             status,
-            // Drop empty rows so we don't pollute the database
-            hotels:  (this.form.value.hotels  || []).filter((h: any) => h.hotel_name),
-            cars:    (this.form.value.cars    || []).filter((c: any) => c.car_type_name),
-            flights: (this.form.value.flights || []).filter((f: any) => f.airline || f.route),
-            misc:    (this.form.value.misc    || []).filter((m: any) => m.label),
+            hotels:  hotels.filter((h: any) => h.hotel_name),
+            cars:    cars.filter((c: any) => c.car_type_name),
+            flights: (rawForm.flights || []).filter((f: any) => f.airline || f.route),
+            misc:    (rawForm.misc || []).filter((m: any) => m.label),
             daywise_itinerary: this.builderDays()
         };
 
@@ -1223,5 +1416,103 @@ export class QuotationBuilderComponent implements OnInit {
 
     formatMeal(m: string): string {
         return ({ none: 'No meals', breakfast: 'Breakfast', breakfast_dinner: 'Breakfast + Dinner', all_inclusive: 'All Inclusive' } as any)[m] || m;
+    }
+
+    onPackageSelect(event: Event) {
+        const val = (event.target as HTMLSelectElement).value;
+        if (!val) {
+            this.form.patchValue({ package_id: null });
+            return;
+        }
+        const pkgId = Number(val);
+        const pkg = this.predefinedPackages().find(p => p.id === pkgId);
+        if (!pkg) return;
+
+        // Auto-fill quotation details
+        this.form.patchValue({
+            package_id: pkg.id,
+            destination_text: pkg.title
+        });
+
+        // Auto-fill dates based on duration
+        const startRaw = this.form.get('trip_start_date')?.value;
+        if (startRaw && pkg.duration_days > 1) {
+            const startDt = new Date(startRaw);
+            const endDt = new Date(startDt);
+            endDt.setDate(endDt.getDate() + (pkg.duration_days - 1));
+            this.form.patchValue({ trip_end_date: endDt.toISOString().substring(0, 10) });
+            this.syncNights();
+        }
+
+        // Auto-fill hotels
+        if (pkg.hotels && Array.isArray(pkg.hotels) && pkg.hotels.length > 0) {
+            this.hotelsArray.clear();
+            pkg.hotels.forEach((h: any) => {
+                this.hotelsArray.push(this.fb.group({
+                    hotel_rate_id: [null],
+                    hotel_name: [h.hotel_name, Validators.required],
+                    star_rating: [null],
+                    room_type: [h.room_type || 'deluxe'],
+                    meal_plan: [h.meal_plan || 'breakfast'],
+                    charge_per_night: [0, [Validators.required, Validators.min(0)]], // 0 because package price is lumped
+                    num_nights: [h.num_nights || 1, [Validators.required, Validators.min(1)]],
+                    num_rooms: [this.form.value.num_rooms || 1, [Validators.min(1)]],
+                    special_charges: [0],
+                    special_charges_note: [''],
+                    currency_code: ['INR'],
+                    exchange_rate: [1.0],
+                    original_rate: [null]
+                }));
+            });
+        }
+
+        // Auto-fill cars
+        if (pkg.cars && Array.isArray(pkg.cars) && pkg.cars.length > 0) {
+            this.carsArray.clear();
+            pkg.cars.forEach((c: any) => {
+                this.carsArray.push(this.fb.group({
+                    car_rate_id: [null],
+                    car_type_name: [c.car_type || 'Standard', Validators.required],
+                    car_class: ['standard'],
+                    charge_per_day: [0, [Validators.required, Validators.min(0)]], // 0 because package price is lumped
+                    num_days: [c.num_days || 1, [Validators.required, Validators.min(1)]],
+                    km_limit_per_day: [250],
+                    extra_charge_per_km: [0],
+                    estimated_extra_km: [0],
+                    currency_code: ['INR'],
+                    exchange_rate: [1.0],
+                    original_rate: [null]
+                }));
+            });
+        }
+
+        // Auto-fill itinerary
+        if (pkg.itinerary && Array.isArray(pkg.itinerary)) {
+            this.builderDays.set(pkg.itinerary);
+        }
+
+        // Auto-fill Terms & Notes (Inclusions/Exclusions)
+        let terms = '';
+        if (pkg.inclusions) terms += '--- INCLUSIONS ---\n' + pkg.inclusions + '\n\n';
+        if (pkg.exclusions) terms += '--- EXCLUSIONS ---\n' + pkg.exclusions + '\n';
+        if (terms) {
+            this.form.patchValue({ terms_notes: terms });
+        }
+
+        // Add the lumped package price to Misc (Other Charges)
+        if (pkg.price > 0) {
+            const adults = Number(this.form.get('adults')?.value) || 1;
+            const existingMisc = this.form.get('misc')?.value || [];
+            
+            // check if there's already a package base price
+            const hasPackageCharge = existingMisc.some((m: any) => m.label && m.label.toLowerCase().includes('package base price'));
+            
+            if (!hasPackageCharge) {
+                this.miscArray.push(this.fb.group({
+                    label: ['Package Base Price (' + pkg.title + ')'],
+                    amount: [pkg.price * adults]
+                }));
+            }
+        }
     }
 }

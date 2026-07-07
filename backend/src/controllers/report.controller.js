@@ -95,10 +95,73 @@ async function getPackagePerformance(req, res) {
     }
 }
 
+async function getPaymentsByGateway(req, res) {
+    const companyId = req.companyId;
+    try {
+        const [rows] = await db.query(
+            `SELECT gateway, 
+                    COUNT(id) as transaction_count, 
+                    COALESCE(SUM(amount), 0) as total_amount
+             FROM payments
+             WHERE company_id = ? AND status = 'paid'
+             GROUP BY gateway
+             ORDER BY total_amount DESC`,
+            [companyId]
+        );
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+async function getLeadConversionRate(req, res) {
+    const companyId = req.companyId;
+    try {
+        const [rows] = await db.query(
+            `SELECT DATE_FORMAT(created_at, '%Y-%m') as month,
+                    COUNT(id) as total_leads,
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as converted_leads
+             FROM leads
+             WHERE company_id = ?
+             GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+             ORDER BY month ASC`,
+            [companyId]
+        );
+        const mapped = rows.map(r => ({
+            month: r.month,
+            total_leads: r.total_leads,
+            converted_leads: r.converted_leads,
+            conversion_rate: r.total_leads > 0 ? ((r.converted_leads / r.total_leads) * 100).toFixed(2) : '0.00'
+        }));
+        res.json(mapped);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
+async function getOutstandingPayments(req, res) {
+    const companyId = req.companyId;
+    try {
+        const [rows] = await db.query(
+            `SELECT id, booking_number, customer_name, total_amount, amount_paid, (total_amount - amount_paid) as outstanding
+             FROM bookings
+             WHERE company_id = ? AND status != 'cancelled' AND total_amount > amount_paid
+             ORDER BY outstanding DESC`,
+            [companyId]
+        );
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+}
+
 module.exports = {
     getSalesByAgent,
     getSalesByDestination,
     getLeadSources,
     getMonthlyRevenue,
-    getPackagePerformance
+    getPackagePerformance,
+    getPaymentsByGateway,
+    getLeadConversionRate,
+    getOutstandingPayments
 };

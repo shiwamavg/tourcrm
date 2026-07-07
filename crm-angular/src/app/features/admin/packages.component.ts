@@ -30,14 +30,14 @@ interface PackageCar {
     template: `
     <div class="page-header">
         <div>
-            <h1>Predefined Tour Packages</h1>
+            <h1>Tour Packages</h1>
             <p>Configure packages available for public booking and fast quote generation</p>
         </div>
     </div>
 
     <!-- Add / Edit Card -->
     <div class="card">
-        <h2>{{ editing() ? 'Edit Predefined Package' : 'Add Predefined Package' }}</h2>
+        <h2>{{ editing() ? 'Edit Tour Package' : 'Add Tour Package' }}</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <div class="form-grid-3">
                 <div class="form-group col-span-2">
@@ -87,6 +87,47 @@ interface PackageCar {
                         </div>
                     }
                 </div>
+            </div>
+
+            <!-- Seat Capacity & Referral Settings -->
+            <div class="form-grid-3" style="margin-top: 1rem; border-top: 1px solid #f3f4f6; padding-top: 1rem;">
+                <div class="form-group">
+                    <label>Total Seats Limit (Max Participants)</label>
+                    <input type="number" formControlName="max_participants" placeholder="e.g. 40 (optional)">
+                </div>
+                <div class="form-group">
+                    <label>Referral Commission Type</label>
+                    <select formControlName="referral_commission_type">
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed Flat Rate (₹)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Referral Commission Rate</label>
+                    <input type="number" formControlName="referral_commission_rate" placeholder="e.g. 10 or 1500">
+                </div>
+            </div>
+
+            <!-- Dynamic Price Surge Settings -->
+            <div class="form-grid-3" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label>Price Surge Rule</label>
+                    <select formControlName="price_surge_type">
+                        <option value="none">No Price Surge</option>
+                        <option value="percentage">Percentage Surge (%)</option>
+                        <option value="fixed">Fixed Surge Amount (₹)</option>
+                    </select>
+                </div>
+                @if (form.get('price_surge_type')?.value !== 'none') {
+                    <div class="form-group">
+                        <label>Surge Threshold (Seats Remaining)</label>
+                        <input type="number" formControlName="price_surge_threshold" placeholder="e.g. 5 (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label>Surge Value (Rate / Amount)</label>
+                        <input type="number" formControlName="price_surge_amount" placeholder="e.g. 15 or 3000">
+                    </div>
+                }
             </div>
 
             <div class="form-group" style="margin-top: 1rem;">
@@ -143,7 +184,7 @@ interface PackageCar {
                     <div class="itinerary-list">
                         @for (h of packageHotels(); track $index) {
                             <div class="itinerary-day-row">
-                                <div class="day-fields" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                                <div class="hotel-fields-grid">
                                     <div class="form-group" style="gap:2px;">
                                         <label style="font-size:11px; font-weight:600;">Hotel Name</label>
                                         <input type="text" [(ngModel)]="h.hotel_name" [ngModelOptions]="{standalone: true}" placeholder="e.g. Mayfair Resort">
@@ -181,7 +222,7 @@ interface PackageCar {
                     <div class="itinerary-list">
                         @for (c of packageCars(); track $index) {
                             <div class="itinerary-day-row">
-                                <div class="day-fields" style="display:grid; grid-template-columns: 1.5fr 0.5fr 2fr; gap: 0.5rem;">
+                                <div class="car-fields-grid">
                                     <div class="form-group" style="gap:2px;">
                                         <label style="font-size:11px; font-weight:600;">Vehicle Type</label>
                                         <input type="text" [(ngModel)]="c.car_type" [ngModelOptions]="{standalone: true}" placeholder="e.g. Toyota Innova / AC Bus">
@@ -220,7 +261,7 @@ interface PackageCar {
     <!-- Listing Card -->
     <div class="card">
         <div class="section-header">
-            <h2 style="margin:0;border:none;padding:0">All Predefined Packages ({{ total() }})</h2>
+            <h2 style="margin:0;border:none;padding:0">All Tour Packages ({{ total() }})</h2>
             <div class="flex" style="gap:0.5rem">
                 <input type="text" [ngModel]="search()" (ngModelChange)="onSearchChange($event)" placeholder="Search packages…" style="min-width:200px">
                 <select [ngModel]="limit()" (ngModelChange)="onLimitChange($event)">
@@ -243,6 +284,7 @@ interface PackageCar {
                             <th>Title</th>
                             <th>Category</th>
                             <th>Duration</th>
+                            <th>Seats Remaining</th>
                             <th>Price</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -270,7 +312,20 @@ interface PackageCar {
                                     </span>
                                 </td>
                                 <td>{{ p.duration_days }}D / {{ p.duration_nights }}N</td>
-                                <td><strong>₹{{ p.price | number }}</strong></td>
+                                <td>
+                                    @if (p.max_participants !== null) {
+                                        <strong>{{ p.remaining_seats }}</strong> / {{ p.max_participants }} left
+                                    } @else {
+                                        <span class="text-muted">Unlimited</span>
+                                    }
+                                </td>
+                                <td>
+                                    <strong>₹{{ p.current_price | number }}</strong>
+                                    @if (p.price !== p.current_price) {
+                                        <div style="font-size:0.75rem; color:var(--text-muted); text-decoration:line-through;">₹{{ p.price | number }} (Base)</div>
+                                        <div style="font-size:0.75rem; color:#ef4444; font-weight:600;">Surged (<= {{ p.price_surge_threshold }} left)</div>
+                                    }
+                                </td>
                                 <td>
                                     @if (p.is_active) { <span class="badge badge-accepted">Active</span> }
                                     @else { <span class="badge badge-draft">Inactive</span> }
@@ -283,7 +338,7 @@ interface PackageCar {
                                 </td>
                             </tr>
                         } @empty {
-                            <tr><td colspan="6" class="empty-state">No packages created yet.</td></tr>
+                            <tr><td colspan="7" class="empty-state">No packages created yet.</td></tr>
                         }
                     </tbody>
                 </table>
@@ -315,12 +370,26 @@ interface PackageCar {
                                 }
                                 <div class="pkg-meta">
                                     <span>📅 {{ p.duration_days }}D / {{ p.duration_nights }}N</span>
-                                    @if (p.hotels) { <span>🏨 Hotels incl.</span> }
-                                    @if (p.cars) { <span>🚗 Transport incl.</span> }
+                                    @if (p.max_participants !== null) {
+                                        <span [style.background]="p.remaining_seats <= (p.price_surge_threshold || 0) ? '#fee2e2' : '#f3f4f6'"
+                                              [style.color]="p.remaining_seats <= (p.price_surge_threshold || 0) ? '#b91c1c' : '#374151'"
+                                              style="font-weight:600">
+                                            💺 {{ p.remaining_seats }} / {{ p.max_participants }} left
+                                        </span>
+                                    } @else {
+                                        <span>💺 Unlimited</span>
+                                    }
+                                    @if (p.hotels && p.hotels.length > 0) { <span>🏨 Hotels</span> }
+                                    @if (p.cars && p.cars.length > 0) { <span>🚗 Transport</span> }
                                 </div>
                             </div>
                             <div class="pkg-footer">
-                                <div class="pkg-price">₹{{ p.price | number }}</div>
+                                <div class="pkg-price">
+                                    ₹{{ p.current_price | number }}
+                                    @if (p.price !== p.current_price) {
+                                        <span style="font-size:11px; text-decoration:line-through; color:var(--text-muted); margin-left:4px;">₹{{ p.price | number }}</span>
+                                    }
+                                </div>
                                 <div class="pkg-actions">
                                     <button class="btn btn-sm" (click)="edit(p)">Edit</button>
                                     <button class="btn btn-sm btn-danger" (click)="deletePkg(p.id)" [disabled]="saving()">✕</button>
@@ -439,10 +508,14 @@ interface PackageCar {
         .pkg-price { font-size: 16px; font-weight: 800; color: #4f46e5; }
         .pkg-actions { display: flex; gap: 6px; }
 
+        .hotel-fields-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+        .car-fields-grid { display: grid; grid-template-columns: 1.5fr 0.5fr 2fr; gap: 0.5rem; }
+
         @media (max-width: 768px) {
             .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
             .col-span-2 { grid-column: span 1; }
             .pkg-grid { grid-template-columns: 1fr 1fr; }
+            .hotel-fields-grid, .car-fields-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 480px) {
             .pkg-grid { grid-template-columns: 1fr; }
@@ -472,16 +545,22 @@ export class PackagesComponent implements OnInit {
     totalPages = () => Math.max(1, Math.ceil(this.total() / this.limit()));
 
     form: FormGroup = this.fb.group({
-        title:           ['', Validators.required],
-        category:        ['Individual / Family', Validators.required],
-        price:           [0, [Validators.required, Validators.min(0)]],
-        duration_days:   [1, [Validators.required, Validators.min(1)]],
-        duration_nights: [0, [Validators.required, Validators.min(0)]],
-        image_url:       [''],
-        description:     [''],
-        inclusions:      [''],
-        exclusions:      [''],
-        is_active:       [true]
+        title:                     ['', Validators.required],
+        category:                  ['Individual / Family', Validators.required],
+        price:                     [0, [Validators.required, Validators.min(0)]],
+        duration_days:             [1, [Validators.required, Validators.min(1)]],
+        duration_nights:           [0, [Validators.required, Validators.min(0)]],
+        image_url:                 [''],
+        description:               [''],
+        inclusions:                [''],
+        exclusions:                [''],
+        is_active:                 [true],
+        max_participants:          [null, [Validators.min(1)]],
+        referral_commission_type:  ['percentage', Validators.required],
+        referral_commission_rate:  [0, [Validators.required, Validators.min(0)]],
+        price_surge_type:          ['none', Validators.required],
+        price_surge_threshold:     [null, [Validators.min(0)]],
+        price_surge_amount:        [0, [Validators.required, Validators.min(0)]]
     });
 
     ngOnInit() {
@@ -518,7 +597,6 @@ export class PackagesComponent implements OnInit {
     removeItineraryDay(index: number) {
         this.itineraryDays.update(days => {
             const copy = days.filter((_, i) => i !== index);
-            // Re-index day numbers
             return copy.map((d, i) => ({ ...d, day: i + 1 }));
         });
     }
@@ -592,33 +670,36 @@ export class PackagesComponent implements OnInit {
     edit(p: any) {
         this.editingId.set(p.id);
         this.form.patchValue({
-            title: p.title,
-            category: p.category || 'Individual / Family',
-            price: p.price,
-            duration_days: p.duration_days,
-            duration_nights: p.duration_nights,
-            image_url: p.image_url || '',
-            description: p.description || '',
-            inclusions: p.inclusions || '',
-            exclusions: p.exclusions || '',
-            is_active: !!p.is_active
+            title:                     p.title,
+            category:                  p.category || 'Individual / Family',
+            price:                     p.price,
+            duration_days:             p.duration_days,
+            duration_nights:           p.duration_nights,
+            image_url:                 p.image_url || '',
+            description:               p.description || '',
+            inclusions:                p.inclusions || '',
+            exclusions:                p.exclusions || '',
+            is_active:                 !!p.is_active,
+            max_participants:          p.max_participants,
+            referral_commission_type:  p.referral_commission_type || 'percentage',
+            referral_commission_rate:  p.referral_commission_rate != null ? Number(p.referral_commission_rate) : 0,
+            price_surge_type:          p.price_surge_type || 'none',
+            price_surge_threshold:     p.price_surge_threshold,
+            price_surge_amount:        p.price_surge_amount != null ? Number(p.price_surge_amount) : 0
         });
 
-        // Set itinerary days
         let rawItin = p.itinerary;
         if (typeof rawItin === 'string') {
             try { rawItin = JSON.parse(rawItin); } catch { rawItin = []; }
         }
         this.itineraryDays.set(rawItin || []);
 
-        // Set hotels
         let rawHotels = p.hotels;
         if (typeof rawHotels === 'string') {
             try { rawHotels = JSON.parse(rawHotels); } catch { rawHotels = []; }
         }
         this.packageHotels.set(rawHotels || []);
 
-        // Set cars
         let rawCars = p.cars;
         if (typeof rawCars === 'string') {
             try { rawCars = JSON.parse(rawCars); } catch { rawCars = []; }
@@ -631,11 +712,17 @@ export class PackagesComponent implements OnInit {
     cancelEdit() {
         this.editingId.set(null);
         this.form.reset({
-            category: 'Individual / Family',
-            price: 0,
-            duration_days: 1,
-            duration_nights: 0,
-            is_active: true
+            category:                  'Individual / Family',
+            price:                     0,
+            duration_days:             1,
+            duration_nights:           0,
+            is_active:                 true,
+            max_participants:          null,
+            referral_commission_type:  'percentage',
+            referral_commission_rate:  0,
+            price_surge_type:          'none',
+            price_surge_threshold:     null,
+            price_surge_amount:        0
         });
         this.itineraryDays.set([]);
         this.packageHotels.set([]);
@@ -679,7 +766,7 @@ export class PackagesComponent implements OnInit {
             next: () => {
                 this.toast.success('Package deleted.');
                 if (this.editingId() === id) {
-                    this.cancelEdit();
+                     this.cancelEdit();
                 }
                 this.fetch();
             },

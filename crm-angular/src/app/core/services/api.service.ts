@@ -147,6 +147,11 @@ export class ApiService {
     deletePackage(id: number): Observable<{ ok: boolean }> {
         return this.http.delete<{ ok: boolean }>(`${this.base}/packages/${id}`);
     }
+    // ── Packages ───────────────────────────────────────────
+    getPackagesAdmin(): Observable<any> {
+        return this.http.get<any>(`${this.base}/packages/admin/all`);
+    }
+
     uploadPackageImage(file: File): Observable<{ url: string }> {
         const fd = new FormData();
         fd.append('image', file);
@@ -454,6 +459,20 @@ export class ApiService {
         return this.http.delete<{ ok: boolean }>(`${this.base}/booking-tasks/${id}`);
     }
 
+    // ── Vendor Costing Ledger ────────────────────────────────────
+    listVendorLedgers(bookingId: number | string): Observable<any[]> {
+        return this.http.get<any[]>(`${this.base}/admin/bookings/${bookingId}/vendor-ledgers`);
+    }
+    createVendorLedger(bookingId: number | string, body: any): Observable<any> {
+        return this.http.post<any>(`${this.base}/admin/bookings/${bookingId}/vendor-ledgers`, body);
+    }
+    updateVendorLedger(bookingId: number | string, ledgerId: number | string, body: any): Observable<any> {
+        return this.http.patch<any>(`${this.base}/admin/bookings/${bookingId}/vendor-ledgers/${ledgerId}`, body);
+    }
+    deleteVendorLedger(bookingId: number | string, ledgerId: number | string): Observable<any> {
+        return this.http.delete<any>(`${this.base}/admin/bookings/${bookingId}/vendor-ledgers/${ledgerId}`);
+    }
+
     // ── Booking Travellers ───────────────────────────────────────
     listBookingTravellers(bookingId: number | string): Observable<BookingTraveller[]> {
         return this.http.get<BookingTraveller[]>(`${this.base}/booking-travellers/${bookingId}`);
@@ -489,6 +508,31 @@ export class ApiService {
     getCalendarBookings(year: number, month: number): Observable<{ items: any[]; year: number; month: number }> {
         let p = new HttpParams().set('year', String(year)).set('month', String(month));
         return this.http.get<{ items: any[]; year: number; month: number }>(`${this.base}/admin/bookings/calendar`, { params: p });
+    }
+
+    // ── B2B Agents (Admin API) ──────────────────────────────────
+    listAgents(params: { status?: string; page?: number; limit?: number } = {}): Observable<{ items: any[]; total: number; page: number; limit: number }> {
+        let p = new HttpParams();
+        if (params.status) p = p.set('status', params.status);
+        if (params.page)   p = p.set('page', String(params.page));
+        if (params.limit)  p = p.set('limit', String(params.limit));
+        return this.http.get<{ items: any[]; total: number; page: number; limit: number }>(`${this.base}/admin/agents`, { params: p });
+    }
+    updateAgentStatus(id: number | string, body: { status?: string; commission_type?: string; commission_rate?: number }): Observable<any> {
+        return this.http.patch<any>(`${this.base}/admin/agents/${id}/status`, body);
+    }
+
+    // ── Commissions (Admin API) ──────────────────────────────────
+    listCommissions(params: { status?: string; agent_id?: number | string; page?: number; limit?: number } = {}): Observable<{ items: any[]; total: number; page: number; limit: number }> {
+        let p = new HttpParams();
+        if (params.status)   p = p.set('status', params.status);
+        if (params.agent_id) p = p.set('agent_id', String(params.agent_id));
+        if (params.page)     p = p.set('page', String(params.page));
+        if (params.limit)    p = p.set('limit', String(params.limit));
+        return this.http.get<{ items: any[]; total: number; page: number; limit: number }>(`${this.base}/admin/commissions`, { params: p });
+    }
+    payCommission(id: number | string, body: { payment_reference: string; notes?: string }): Observable<any> {
+        return this.http.post<any>(`${this.base}/admin/commissions/${id}/pay`, body);
     }
 }
 

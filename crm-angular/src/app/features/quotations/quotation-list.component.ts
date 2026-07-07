@@ -63,7 +63,7 @@ import { QuotationListItem, QuotationStatus } from '../../core/models';
                     <th>Validity</th>
                     <th class="num">Total</th>
                     <th>Created</th>
-                    <th>Actions</th>
+                    <th class="actions-col">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -79,7 +79,7 @@ import { QuotationListItem, QuotationStatus } from '../../core/models';
                 } @else {
                     @for (q of items(); track q.id) {
                         <tr [class.row-expiring]="isExpiringSoon(q) && q.status === 'sent'">
-                            <td>
+                            <td data-label="Number">
                                 <a [routerLink]="['/quotations', q.id]"><strong>{{ q.quotation_number }}</strong></a>
                                 @if (isExpiringSoon(q) && q.status === 'sent') {
                                     <span class="expiry-badge">⏰ Expiring soon</span>
@@ -88,20 +88,20 @@ import { QuotationListItem, QuotationStatus } from '../../core/models';
                                     <span class="expired-badge">❌ Expired</span>
                                 }
                             </td>
-                            <td>
+                            <td data-label="Customer">
                                 {{ q.customer_name }}
                                 <br><small class="text-muted">{{ q.customer_phone }}</small>
                             </td>
-                            <td>{{ q.destination_name || q.destination_text || '—' }}</td>
-                            <td>
+                            <td data-label="Destination">{{ q.destination_name || q.destination_text || '—' }}</td>
+                            <td data-label="Travel">
                                 {{ q.trip_start_date | date:'mediumDate' }}
                                 <br><small class="text-muted">to {{ q.trip_end_date | date:'mediumDate' }}</small>
                             </td>
-                            <td><span class="badge badge-draft">{{ formatPackage(q.package_type) }}</span></td>
-                            <td>
+                            <td data-label="Package"><span class="badge badge-draft">{{ formatPackage(q.package_type) }}</span></td>
+                            <td data-label="Status">
                                 <span class="badge" [class]="'badge-' + q.status">{{ q.status }}</span>
                             </td>
-                            <td>
+                            <td data-label="Validity">
                                 @if (q.valid_until) {
                                     <span [class.text-danger]="isExpiringSoon(q)" [class.text-muted]="!isExpiringSoon(q)">
                                         {{ q.valid_until | date:'d MMM yyyy' }}
@@ -111,9 +111,9 @@ import { QuotationListItem, QuotationStatus } from '../../core/models';
                                     </span>
                                 } @else { <span class="text-muted">—</span> }
                             </td>
-                            <td class="num">₹{{ q.grand_total | number:'1.0-0' }}</td>
-                            <td>{{ q.created_at | date:'short' }}</td>
-                            <td>
+                            <td class="num" data-label="Total">₹{{ q.grand_total | number:'1.0-0' }}</td>
+                            <td data-label="Created">{{ q.created_at | date:'short' }}</td>
+                            <td data-label="">
                                 <div class="row-actions">
                                     <a [routerLink]="['/quotations', q.id]" class="btn btn-sm">View</a>
                                     @if (q.status === 'accepted' && !q.booking_id) {
@@ -236,6 +236,37 @@ import { QuotationListItem, QuotationStatus } from '../../core/models';
         .btn-primary { background:#0f766e; color:#fff; }
         .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
         .btn-outline { background:#fff; color:#374151; border:1px solid #d1d5db; }
+
+        @media (max-width: 768px) {
+            .page-header { flex-direction:column; align-items:stretch; }
+            .page-header a.btn { text-align:center; }
+            .toolbar { flex-direction:column; }
+            .toolbar input, .toolbar select { max-width:100%; width:100%; }
+            .table-wrap { overflow:visible; border:none; box-shadow:none; background:transparent; }
+            .data-table, .data-table tbody, .data-table tr, .data-table td { display:block; }
+            .data-table thead { display:none; }
+            .data-table tbody tr {
+                background:#fff; border:1px solid #e2e8f0; border-radius:12px;
+                padding:14px; margin-bottom:12px;
+                box-shadow:0 1px 3px rgba(0,0,0,0.06);
+            }
+            .data-table tbody tr.row-expiring { background:#fffbeb; }
+            .data-table td {
+                display:flex; align-items:center; gap:6px;
+                padding:4px 0; border:none; font-size:13px;
+            }
+            .data-table td::before {
+                content:attr(data-label); flex-shrink:0; min-width:80px;
+                font-size:10px; font-weight:600; text-transform:uppercase;
+                letter-spacing:0.04em; color:#94a3b8;
+            }
+            .data-table td.num { text-align:left; }
+            .data-table td:first-child { font-size:14px; }
+            .data-table td:last-child::before { display:none; }
+            .data-table td:last-child { padding-top:8px; margin-top:6px; border-top:1px solid #e2e8f0; }
+            .row-actions { flex-wrap:wrap; }
+            .flex.between { flex-direction:column; gap:8px; align-items:flex-start; }
+        }
     `]
 })
 export class QuotationListComponent implements OnInit {

@@ -5,16 +5,51 @@ const sanitize = (s) => (s == null ? '' : String(s).trim());
 const isEmail  = (s) => !s || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s).trim());
 const isPhone  = (s) => !!s && /^[+\d][\d\s\-()]{5,20}$/.test(String(s).trim());
 
+const mapPackageFields = (r) => {
+    let current_price = Number(r.price);
+    const booked = Number(r.booked_seats || 0);
+    const remaining = r.max_participants === null ? null : Math.max(0, Number(r.max_participants) - booked);
+    
+    if (r.max_participants !== null && remaining !== null && r.price_surge_type !== 'none' && r.price_surge_threshold !== null && remaining <= r.price_surge_threshold) {
+        if (r.price_surge_type === 'percentage') {
+            current_price = Number(r.price) * (1 + Number(r.price_surge_amount) / 100);
+        } else if (r.price_surge_type === 'fixed') {
+            current_price = Number(r.price) + Number(r.price_surge_amount);
+        }
+    }
+    
+    if (typeof r.itinerary === 'string') { try { r.itinerary = JSON.parse(r.itinerary); } catch {} }
+    if (typeof r.hotels === 'string') { try { r.hotels = JSON.parse(r.hotels); } catch {} }
+    if (typeof r.cars === 'string') { try { r.cars = JSON.parse(r.cars); } catch {} }
+    
+    return {
+        ...r,
+        booked_seats: booked,
+        remaining_seats: remaining,
+        current_price
+    };
+};
+
 // ── PUBLIC ENDPOINTS (No Auth, scoped by company_id) ─────────────────
 
 const listPublic = async (req, res, next) => {
     try {
         const companyId = req.query.company_id || 1; // Default to company 1
         const [rows] = await db.query(
-            'SELECT * FROM packages WHERE company_id = ? AND is_active = 1 ORDER BY id DESC',
+            `SELECT p.*, COALESCE(b.booked_seats, 0) AS booked_seats
+               FROM packages p
+          LEFT JOIN (
+              SELECT package_id,
+                     SUM(COALESCE(adults, 0) + COALESCE(children_below_5, 0) + COALESCE(children_above_5, 0)) AS booked_seats
+                FROM bookings
+               WHERE status != 'cancelled' AND package_id IS NOT NULL
+               GROUP BY package_id
+          ) b ON b.package_id = p.id
+              WHERE p.company_id = ? AND p.is_active = 1
+           ORDER BY p.id DESC`,
             [companyId]
         );
-        res.json(rows);
+        res.json(rows.map(mapPackageFields));
     } catch (err) {
         next(err);
     }
@@ -23,14 +58,23 @@ const listPublic = async (req, res, next) => {
 const getPublicDetail = async (req, res, next) => {
     try {
         const [rows] = await db.query(
-            'SELECT * FROM packages WHERE id = ? AND is_active = 1',
+            `SELECT p.*, COALESCE(b.booked_seats, 0) AS booked_seats
+               FROM packages p
+          LEFT JOIN (
+              SELECT package_id,
+                     SUM(COALESCE(adults, 0) + COALESCE(children_below_5, 0) + COALESCE(children_above_5, 0)) AS booked_seats
+                FROM bookings
+               WHERE status != 'cancelled' AND package_id IS NOT NULL
+               GROUP BY package_id
+          ) b ON b.package_id = p.id
+              WHERE p.id = ? AND p.is_active = 1`,
             [req.params.id]
         );
         const pkg = rows[0];
         if (!pkg) {
             return res.status(404).json({ error: 'Package not found or inactive' });
         }
-        res.json(pkg);
+        res.json(mapPackageFields(pkg));
     } catch (err) {
         next(err);
     }
@@ -39,20 +83,59 @@ const getPublicDetail = async (req, res, next) => {
 const bookPackagePublic = async (req, res) => {
     try {
         const packageId = req.params.id;
-        const { full_name, email, phone, travel_date, travellers, notes } = req.body || {};
+        const { full_name, email, phone, travel_date, travellers, notes, ref_agent, ref_booking } = req.body || {};
 
         if (!sanitize(full_name)) return res.status(400).json({ error: 'Please tell us your name.' });
         if (!isPhone(phone))      return res.status(400).json({ error: 'Please provide a valid phone number.' });
         if (!sanitize(email) || !isEmail(email)) return res.status(400).json({ error: 'Please provide a valid email.' });
 
-        // Retrieve package to get company_id and title
-        const [pkgs] = await db.query('SELECT * FROM packages WHERE id = ? AND is_active = 1', [packageId]);
+        // Retrieve package to get company_id, title, max_participants and booked count
+        const [pkgs] = await db.query(`
+            SELECT p.*,
+                   COALESCE(b.booked_seats, 0) AS booked_seats
+            FROM packages p
+            LEFT JOIN (
+                SELECT package_id,
+                       SUM(COALESCE(adults, 0) + COALESCE(children_below_5, 0) + COALESCE(children_above_5, 0)) AS booked_seats
+                FROM bookings
+                WHERE status != 'cancelled' AND package_id = ?
+                GROUP BY package_id
+            ) b ON b.package_id = p.id
+            WHERE p.id = ? AND p.is_active = 1
+        `, [packageId, packageId]);
+
         const pkg = pkgs[0];
         if (!pkg) {
             return res.status(404).json({ error: 'Selected package is not available.' });
         }
 
+        const bookedSeats = Number(pkg.booked_seats);
+        const reqTravellers = Number(travellers) || 1;
+        if (pkg.max_participants !== null) {
+            const remaining = pkg.max_participants - bookedSeats;
+            if (reqTravellers > remaining) {
+                return res.status(400).json({ error: `Not enough seats available. Only ${remaining} seat(s) remaining.` });
+            }
+        }
+
         const targetCompanyId = pkg.company_id;
+
+        // Resolve referral IDs
+        let referrerAgentId = null;
+        let referrerBookingId = null;
+
+        if (ref_agent) {
+            referrerAgentId = Number(ref_agent);
+        }
+        if (ref_booking) {
+            const [bRows] = await db.query(
+                'SELECT id FROM bookings WHERE booking_number = ? AND company_id = ? LIMIT 1',
+                [String(ref_booking).trim(), targetCompanyId]
+            );
+            if (bRows[0]) {
+                referrerBookingId = bRows[0].id;
+            }
+        }
 
         // Composed notes
         const composedNotes = [
@@ -65,14 +148,16 @@ const bookPackagePublic = async (req, res) => {
         // Insert into leads
         const [ins] = await db.query(
             `INSERT INTO leads
-                (full_name, email, phone, destination_text, package_id, source, status, notes, source_meta, company_id)
-             VALUES (?, ?, ?, ?, ?, 'website_form', 'new', ?, ?, ?)`,
+                (full_name, email, phone, destination_text, package_id, agent_id, referrer_booking_id, source, status, notes, source_meta, company_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'website_form', 'new', ?, ?, ?)`,
             [
                 sanitize(full_name),
                 sanitize(email) || null,
                 sanitize(phone),
                 pkg.title,
                 pkg.id,
+                referrerAgentId,
+                referrerBookingId,
                 composedNotes,
                 JSON.stringify({
                     ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
@@ -123,16 +208,16 @@ const bookPackagePublic = async (req, res) => {
 const listAdmin = async (req, res, next) => {
     try {
         const { q, is_active, page = 1, limit = 50 } = req.query;
-        const where = ['company_id = ?'];
+        const where = ['p.company_id = ?'];
         const params = [req.companyId];
 
         if (is_active !== undefined && is_active !== '') {
-            where.push('is_active = ?');
+            where.push('p.is_active = ?');
             params.push(is_active === 'true' || is_active === '1' ? 1 : 0);
         }
 
         if (q) {
-            where.push('(title LIKE ? OR description LIKE ?)');
+            where.push('(p.title LIKE ? OR p.description LIKE ?)');
             const like = `%${q}%`;
             params.push(like, like);
         }
@@ -142,17 +227,27 @@ const listAdmin = async (req, res, next) => {
         const offset = (Math.max(1, Number(page)) - 1) * lim;
 
         const [rows] = await db.query(
-            `SELECT * FROM packages ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+            `SELECT p.*, COALESCE(b.booked_seats, 0) AS booked_seats
+               FROM packages p
+          LEFT JOIN (
+              SELECT package_id,
+                     SUM(COALESCE(adults, 0) + COALESCE(children_below_5, 0) + COALESCE(children_above_5, 0)) AS booked_seats
+                FROM bookings
+               WHERE status != 'cancelled' AND package_id IS NOT NULL
+               GROUP BY package_id
+          ) b ON b.package_id = p.id
+               ${whereSql}
+           ORDER BY p.id DESC LIMIT ? OFFSET ?`,
             [...params, lim, offset]
         );
 
         const [count] = await db.query(
-            `SELECT COUNT(*) AS total FROM packages ${whereSql}`,
+            `SELECT COUNT(*) AS total FROM packages p ${whereSql}`,
             params
         );
 
         res.json({
-            items: rows,
+            items: rows.map(mapPackageFields),
             total: count[0].total,
             page: Number(page),
             limit: lim
@@ -164,7 +259,12 @@ const listAdmin = async (req, res, next) => {
 
 const createPackage = async (req, res, next) => {
     try {
-        const { title, category, description, price = 0, duration_days = 1, duration_nights = 0, image_url, inclusions, exclusions, itinerary, hotels, cars } = req.body || {};
+        const {
+            title, category, description, price = 0, duration_days = 1, duration_nights = 0, image_url,
+            inclusions, exclusions, itinerary, hotels, cars,
+            max_participants, referral_commission_type = 'percentage', referral_commission_rate = 0,
+            price_surge_type = 'none', price_surge_threshold, price_surge_amount = 0
+        } = req.body || {};
 
         if (!sanitize(title)) {
             return res.status(400).json({ error: 'Package title is required' });
@@ -176,14 +276,23 @@ const createPackage = async (req, res, next) => {
 
         const [r] = await db.query(
             `INSERT INTO packages
-                (company_id, title, category, description, price, duration_days, duration_nights, image_url, inclusions, exclusions, itinerary, hotels, cars, is_active)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+                (company_id, title, category, description, price, max_participants,
+                 referral_commission_type, referral_commission_rate, price_surge_type,
+                 price_surge_threshold, price_surge_amount,
+                 duration_days, duration_nights, image_url, inclusions, exclusions, itinerary, hotels, cars, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
             [
                 req.companyId,
                 sanitize(title),
                 sanitize(category) || 'Individual / Family',
                 sanitize(description) || null,
                 Number(price),
+                max_participants ? Number(max_participants) : null,
+                referral_commission_type || 'percentage',
+                Number(referral_commission_rate),
+                price_surge_type || 'none',
+                price_surge_threshold ? Number(price_surge_threshold) : null,
+                Number(price_surge_amount),
                 Number(duration_days),
                 Number(duration_nights),
                 sanitize(image_url) || null,
@@ -196,7 +305,7 @@ const createPackage = async (req, res, next) => {
         );
 
         const [created] = await db.query('SELECT * FROM packages WHERE id = ? AND company_id = ?', [r.insertId, req.companyId]);
-        res.status(201).json(created[0]);
+        res.status(201).json(mapPackageFields(created[0]));
     } catch (err) {
         next(err);
     }
@@ -205,7 +314,12 @@ const createPackage = async (req, res, next) => {
 const updatePackage = async (req, res, next) => {
     try {
         const id = req.params.id;
-        const allowed = ['title', 'category', 'description', 'price', 'duration_days', 'duration_nights', 'image_url', 'inclusions', 'exclusions', 'itinerary', 'hotels', 'cars', 'is_active'];
+        const allowed = [
+            'title', 'category', 'description', 'price', 'duration_days', 'duration_nights', 'image_url',
+            'inclusions', 'exclusions', 'itinerary', 'hotels', 'cars', 'is_active',
+            'max_participants', 'referral_commission_type', 'referral_commission_rate',
+            'price_surge_type', 'price_surge_threshold', 'price_surge_amount'
+        ];
         
         const sets = [];
         const params = [];
@@ -215,8 +329,10 @@ const updatePackage = async (req, res, next) => {
                 sets.push(`${k} = ?`);
                 if ((k === 'itinerary' || k === 'hotels' || k === 'cars') && typeof req.body[k] !== 'string') {
                     params.push(req.body[k] ? JSON.stringify(req.body[k]) : null);
-                } else if (k === 'price' || k === 'duration_days' || k === 'duration_nights') {
+                } else if (k === 'price' || k === 'duration_days' || k === 'duration_nights' || k === 'referral_commission_rate' || k === 'price_surge_amount') {
                     params.push(Number(req.body[k]));
+                } else if (k === 'max_participants' || k === 'price_surge_threshold') {
+                    params.push(req.body[k] ? Number(req.body[k]) : null);
                 } else if (k === 'is_active') {
                     params.push(req.body[k] ? 1 : 0);
                 } else {
@@ -239,7 +355,7 @@ const updatePackage = async (req, res, next) => {
         }
 
         const [updated] = await db.query('SELECT * FROM packages WHERE id = ? AND company_id = ?', [id, req.companyId]);
-        res.json(updated[0]);
+        res.json(mapPackageFields(updated[0]));
     } catch (err) {
         next(err);
     }

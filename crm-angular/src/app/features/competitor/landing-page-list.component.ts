@@ -18,6 +18,7 @@ import { ToastService } from '../../core/services/toast.service';
         <label>Meta Description <input type="text" [(ngModel)]="form.meta_description" /></label>
         <label>Hero Title <input type="text" [(ngModel)]="form.hero_title" /></label>
         <label>Hero Subtitle <textarea [(ngModel)]="form.hero_subtitle" rows="2"></textarea></label>
+        <label>Custom CSS (Optional) <textarea [(ngModel)]="form.custom_css" rows="3" placeholder="body { background: #f3f4f6; }"></textarea></label>
         <label>SEO Keywords <input type="text" [(ngModel)]="form.seo_keywords" placeholder="comma-separated" /></label>
         <label style="flex-direction:row;align-items:center;gap:8px;">
             <input type="checkbox" [(ngModel)]="form.is_published" /> Published
@@ -33,12 +34,13 @@ import { ToastService } from '../../core/services/toast.service';
         <tbody>
             @for (p of pages(); track p.id) {
                 <tr>
-                    <td>{{ p.title }}</td>
+                    <td><strong>{{ p.title }}</strong></td>
                     <td>{{ p.slug }}</td>
                     <td>{{ p.created_at | date:'shortDate' }}</td>
                     <td>@if (p.is_published) { <span class="badge">Yes</span> } @else { <span class="badge no">No</span> }</td>
                     <td>
-                        <button class="btn small" (click)="edit(p)">Edit</button>
+                        <button class="btn small" (click)="edit(p)" style="margin-right:4px;">Edit</button>
+                        <a class="btn small ghost" [href]="'http://localhost:3000/api/pages/' + p.slug" target="_blank" style="margin-right:4px; text-decoration:none;">View Page</a>
                         <button class="btn small warn" (click)="remove(p.id)">Delete</button>
                     </td>
                 </tr>
@@ -48,7 +50,7 @@ import { ToastService } from '../../core/services/toast.service';
     `,
     styles: [`
         h1 { margin:0 0 14px; font-size:1.3rem; }
-        .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; }
+        .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; display:inline-block; }
         .btn.ghost { background:#f3f4f6; color:#374151; }
         .btn.small { padding:4px 8px; font-size:12px; }
         .btn.warn { background:#b91c1c; }
@@ -72,7 +74,7 @@ export class LandingPageListComponent implements OnInit {
     showForm = signal(false);
     saving = signal(false);
     editingId = signal<number | null>(null);
-    form: any = { title: '', slug: '', meta_description: '', hero_title: '', hero_subtitle: '', seo_keywords: '', is_published: false };
+    form: any = { title: '', slug: '', meta_description: '', hero_title: '', hero_subtitle: '', custom_css: '', seo_keywords: '', is_published: false };
 
     ngOnInit() { this.load(); }
     load() { this.api.list().subscribe(r => this.pages.set(r)); }
@@ -87,7 +89,7 @@ export class LandingPageListComponent implements OnInit {
         this.saving.set(true);
         const op = this.editingId() ? this.api.update(this.editingId()!, this.form) : this.api.create(this.form);
         op.subscribe({
-            next: () => { this.saving.set(false); this.showForm.set(false); this.editingId.set(null); this.form = { title: '', slug: '', meta_description: '', hero_title: '', hero_subtitle: '', seo_keywords: '', is_published: false }; this.load(); this.toast.success('Saved'); },
+            next: () => { this.saving.set(false); this.showForm.set(false); this.editingId.set(null); this.form = { title: '', slug: '', meta_description: '', hero_title: '', hero_subtitle: '', custom_css: '', seo_keywords: '', is_published: false }; this.load(); this.toast.success('Saved'); },
             error: () => { this.saving.set(false); this.toast.error('Failed'); }
         });
     }

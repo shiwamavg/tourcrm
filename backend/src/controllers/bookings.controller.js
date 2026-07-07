@@ -45,13 +45,15 @@ const getBooking = async (req, res, next) => {
             `SELECT b.*, d.name AS destination_name, q.quotation_number, q.package_type,
                     pq.quotation_number AS parent_quotation_number,
                     su.full_name AS created_by_name,
-                    p.title AS package_title
+                    p.title AS package_title,
+                    a.agency_name AS agent_agency_name, a.agent_name AS agent_contact_name
                FROM bookings b
                LEFT JOIN quotations q  ON q.id  = b.quotation_id AND q.company_id = b.company_id
                LEFT JOIN quotations pq ON pq.id = q.parent_quotation_id AND pq.company_id = b.company_id
                LEFT JOIN destinations d ON d.id = q.destination_id AND d.company_id = b.company_id
                LEFT JOIN staff_users  su ON su.id = b.created_by AND su.company_id = b.company_id
                LEFT JOIN packages     p  ON p.id  = b.package_id AND p.company_id = b.company_id
+               LEFT JOIN agents       a  ON a.id  = b.agent_id AND a.company_id = b.company_id
               WHERE b.id = ? AND b.company_id = ?`, [req.params.id, req.companyId]
         );
         const b = rows[0];
@@ -96,6 +98,19 @@ const updateStatus = async (req, res, next) => {
         );
         if (!r.affectedRows) return res.status(404).json({ error: 'Booking not found' });
 
+        // Update commission status
+        if (status === 'cancelled') {
+            await db.query(
+                "UPDATE commissions SET status = 'cancelled' WHERE booking_id = ? AND company_id = ? AND status != 'paid'",
+                [req.params.id, req.companyId]
+            );
+        } else {
+            await db.query(
+                "UPDATE commissions SET status = 'pending' WHERE booking_id = ? AND company_id = ? AND status = 'cancelled'",
+                [req.params.id, req.companyId]
+            );
+        }
+
         try {
             const { logFollowup } = require('../services/followup.service');
             await logFollowup(null, {
@@ -119,8 +134,8 @@ const updateStatus = async (req, res, next) => {
 const generateBookingNumber = async (conn, companyId) => {
     const year = new Date().getFullYear();
     const [rows] = await conn.query(
-        'SELECT COUNT(*) AS c FROM bookings WHERE YEAR(created_at) = ? AND company_id = ?',
-        [year, companyId]
+        'SELECT COUNT(*) AS c FROM bookings WHERE YEAR(created_at) = ?',
+        [year]
     );
     const seq = String(Number(rows[0].c || 0) + 1).padStart(4, '0');
     return `BKG-${year}-${seq}`;
@@ -148,26 +163,75 @@ const createBooking = async (req, res, next) => {
         }
         const q = qResult[0];
 
+        let agentId = q.agent_id || null;
+        let agentCommission = 0.00;
+
+        if (agentId) {
+            const [agentRows] = await conn.query(
+                'SELECT commission_type, commission_rate FROM agents WHERE id = ? AND company_id = ?',
+                [agentId, req.companyId]
+            );
+            if (agentRows.length > 0) {
+                const agent = agentRows[0];
+                if (agent.commission_type === 'percentage') {
+                    agentCommission = Number(q.subtotal) * (Number(agent.commission_rate) / 100);
+                } else if (agent.commission_type === 'fixed') {
+                    agentCommission = Number(agent.commission_rate);
+                }
+            }
+        }
+
         const bookingNumber = await generateBookingNumber(conn, req.companyId);
         const feePct = booking_fee_pct || 20;
         const feeAmount = (q.grand_total * feePct / 100);
 
         const [bResult] = await conn.query(`
             INSERT INTO bookings (
-                booking_number, quotation_id, package_id, customer_name, customer_phone, customer_email,
+                booking_number, quotation_id, package_id, referrer_booking_id, customer_name, customer_phone, customer_email,
                 destination_text, trip_start_date, trip_end_date, adults,
                 children_below_5, children_above_5, total_amount,
                 booking_fee_pct, booking_fee_amount, amount_paid, status, payment_status,
-                special_requests, internal_notes, created_by, company_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending','pending',?,?,?,?)
+                special_requests, internal_notes, created_by, company_id, agent_id, agent_commission
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending','pending',?,?,?,?,?,?)
         `, [
-            bookingNumber, quotation_id, q.package_id || null, q.customer_name, q.customer_phone, q.customer_email || null,
+            bookingNumber, quotation_id, q.package_id || null, q.referrer_booking_id || null, q.customer_name, q.customer_phone, q.customer_email || null,
             q.destination_text, q.trip_start_date, q.trip_end_date, q.adults,
             q.children_below_5, q.children_above_5, q.grand_total,
-            feePct, feeAmount, special_requests || null, internal_notes || null, req.user.id, req.companyId
+            feePct, feeAmount, special_requests || null, internal_notes || null, req.user.id, req.companyId,
+            agentId, agentCommission
         ]);
 
         const bookingId = bResult.insertId;
+
+        if (agentId) {
+            await conn.query(`
+                INSERT INTO commissions (company_id, agent_id, booking_id, amount, status)
+                VALUES (?, ?, ?, ?, 'pending')
+            `, [req.companyId, agentId, bookingId, agentCommission]);
+        }
+
+        if (q.referrer_booking_id && q.package_id) {
+            const [pkgs] = await conn.query(
+                'SELECT price, referral_commission_type, referral_commission_rate FROM packages WHERE id = ?',
+                [q.package_id]
+            );
+            if (pkgs[0]) {
+                const pkg = pkgs[0];
+                let refCommission = 0.00;
+                if (pkg.referral_commission_type === 'percentage') {
+                    refCommission = q.grand_total * (Number(pkg.referral_commission_rate) / 100);
+                } else if (pkg.referral_commission_type === 'fixed') {
+                    refCommission = Number(pkg.referral_commission_rate);
+                }
+                
+                if (refCommission > 0) {
+                    await conn.query(`
+                        INSERT INTO commissions (company_id, referrer_booking_id, booking_id, amount, status)
+                        VALUES (?, ?, ?, ?, 'pending')
+                    `, [req.companyId, q.referrer_booking_id, bookingId, refCommission]);
+                }
+            }
+        }
 
         await conn.query(
             `UPDATE quotations SET status = 'accepted' WHERE id = ? AND company_id = ?`,
@@ -248,4 +312,139 @@ const getCalendarBookings = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-module.exports = { listBookings, getBooking, updateStatus, createBooking, getCalendarBookings };
+const recalculateBookingProfit = async (bookingId, companyId) => {
+    // 1. Get booking total amount and agent commission
+    const [[booking]] = await db.query(
+        'SELECT total_amount, agent_commission FROM bookings WHERE id = ? AND company_id = ?',
+        [bookingId, companyId]
+    );
+    if (!booking) return;
+
+    // 2. Sum up vendor costing cost_amount
+    const [[costRow]] = await db.query(
+        'SELECT SUM(cost_amount) AS total_cost FROM vendor_ledgers WHERE booking_id = ? AND company_id = ?',
+        [bookingId, companyId]
+    );
+    const totalCost = Number(costRow.total_cost || 0);
+
+    // 3. Sum up referral commissions
+    const [[referralRow]] = await db.query(
+        'SELECT SUM(amount) AS total_ref FROM commissions WHERE booking_id = ? AND company_id = ? AND status != "cancelled" AND agent_id IS NULL',
+        [bookingId, companyId]
+    );
+    const totalReferral = Number(referralRow.total_ref || 0);
+
+    // 4. Net Profit calculation
+    const netProfit = Number(booking.total_amount) - Number(booking.agent_commission) - totalCost - totalReferral;
+
+    // 5. Update bookings table
+    await db.query(
+        'UPDATE bookings SET vendor_cost = ?, net_profit = ? WHERE id = ? AND company_id = ?',
+        [totalCost, netProfit, bookingId, companyId]
+    );
+};
+
+const listVendorLedgers = async (req, res, next) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT vl.*, s.name AS supplier_name, s.type AS supplier_type
+               FROM vendor_ledgers vl
+               JOIN suppliers s ON s.id = vl.supplier_id
+              WHERE vl.booking_id = ? AND vl.company_id = ?
+              ORDER BY vl.id DESC`,
+            [req.params.id, req.companyId]
+        );
+        res.json(rows);
+    } catch (err) { next(err); }
+};
+
+const createVendorLedger = async (req, res, next) => {
+    try {
+        const { supplier_id, cost_amount, paid_amount, notes } = req.body || {};
+        if (!supplier_id || cost_amount == null) {
+            return res.status(400).json({ error: 'supplier_id and cost_amount are required' });
+        }
+        
+        let status = 'pending';
+        const cost = Number(cost_amount);
+        const paid = Number(paid_amount || 0);
+        if (paid >= cost && cost > 0) {
+            status = 'paid';
+        } else if (paid > 0) {
+            status = 'partial';
+        }
+
+        const [r] = await db.query(
+            `INSERT INTO vendor_ledgers (company_id, booking_id, supplier_id, cost_amount, paid_amount, status, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.companyId, req.params.id, supplier_id, cost, paid, status, notes || null]
+        );
+
+        await recalculateBookingProfit(req.params.id, req.companyId);
+
+        const [rows] = await db.query('SELECT * FROM vendor_ledgers WHERE id = ?', [r.insertId]);
+        res.status(201).json(rows[0]);
+    } catch (err) { next(err); }
+};
+
+const updateVendorLedger = async (req, res, next) => {
+    try {
+        const { cost_amount, paid_amount, notes } = req.body || {};
+        const { id: bookingId, ledgerId } = req.params;
+
+        const [[existing]] = await db.query(
+            'SELECT * FROM vendor_ledgers WHERE id = ? AND booking_id = ? AND company_id = ?',
+            [ledgerId, bookingId, req.companyId]
+        );
+        if (!existing) return res.status(404).json({ error: 'Vendor ledger entry not found' });
+
+        const cost = cost_amount != null ? Number(cost_amount) : Number(existing.cost_amount);
+        const paid = paid_amount != null ? Number(paid_amount) : Number(existing.paid_amount);
+
+        let status = 'pending';
+        if (paid >= cost && cost > 0) {
+            status = 'paid';
+        } else if (paid > 0) {
+            status = 'partial';
+        }
+
+        await db.query(
+            `UPDATE vendor_ledgers
+                SET cost_amount = ?, paid_amount = ?, status = ?, notes = ?
+              WHERE id = ? AND booking_id = ? AND company_id = ?`,
+            [cost, paid, status, notes !== undefined ? notes : existing.notes, ledgerId, bookingId, req.companyId]
+        );
+
+        await recalculateBookingProfit(bookingId, req.companyId);
+
+        const [rows] = await db.query('SELECT * FROM vendor_ledgers WHERE id = ?', [ledgerId]);
+        res.json(rows[0]);
+    } catch (err) { next(err); }
+};
+
+const deleteVendorLedger = async (req, res, next) => {
+    try {
+        const { id: bookingId, ledgerId } = req.params;
+        const [r] = await db.query(
+            'DELETE FROM vendor_ledgers WHERE id = ? AND booking_id = ? AND company_id = ?',
+            [ledgerId, bookingId, req.companyId]
+        );
+        if (!r.affectedRows) return res.status(404).json({ error: 'Vendor ledger entry not found' });
+
+        await recalculateBookingProfit(bookingId, req.companyId);
+
+        res.json({ message: 'Deleted successfully' });
+    } catch (err) { next(err); }
+};
+
+module.exports = {
+    listBookings,
+    getBooking,
+    updateStatus,
+    createBooking,
+    getCalendarBookings,
+    listVendorLedgers,
+    createVendorLedger,
+    updateVendorLedger,
+    deleteVendorLedger
+};

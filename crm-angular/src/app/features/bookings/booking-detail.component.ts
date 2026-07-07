@@ -7,6 +7,8 @@ import { ApiService } from '../../core/services/api.service';
 import { ToastService } from '../../core/services/toast.service';
 import { PaymentGateway, PaymentStatus2, BookingTraveller } from '../../core/models';
 import { FollowupTimelineComponent } from '../../shared/components/followup-timeline.component';
+import { SupplierService, WhatsappService } from '../../core/services/competitor-features.service';
+import { PdfService } from '../../core/services/pdf.service';
 
 @Component({
     selector: 'app-booking-detail',
@@ -37,8 +39,15 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                     }
                 </p>
             </div>
-            <div class="flex">
+            <div class="flex" style="gap:8px">
                 <a routerLink="/bookings" class="btn">← Back</a>
+                <button class="btn btn-outline" (click)="downloadVoucher()" [disabled]="generatingVoucher()">
+                    @if (generatingVoucher()) { <span class="spinner"></span> }
+                    @else { 📄 Download Voucher }
+                </button>
+                <button class="btn btn-outline" (click)="openWhatsappModal()">
+                    💬 Send WhatsApp
+                </button>
                 <button class="btn btn-success" (click)="openPaymentModal()">+ Record Payment</button>
             </div>
         </div>
@@ -78,6 +87,24 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                     @else { • <strong class="text-success">Fully paid</strong> }
                 </div>
             </div>
+            <div class="stat-card" [style.border-left]="'4px solid ' + (booking()!.net_profit >= 0 ? '#10b981' : '#ef4444')">
+                <div class="label">Vendor Cost / Net Profit</div>
+                <div class="value" style="font-size:1.1rem" [class.text-success]="booking()!.net_profit >= 0" [class.text-danger]="booking()!.net_profit < 0">
+                    Cost: ₹{{ booking()!.vendor_cost | number:'1.0-0' }} / Profit: ₹{{ booking()!.net_profit | number:'1.0-0' }}
+                </div>
+                <div class="text-muted">
+                    Profit Margin: <strong>{{ booking()!.total_amount > 0 ? (booking()!.net_profit / booking()!.total_amount * 100 | number:'1.0-1') : 0 }}%</strong>
+                </div>
+            </div>
+            @if (booking()!.agent_id) {
+                <div class="stat-card" style="border-left: 4px solid #4f46e5">
+                    <div class="label">B2B Agent Partner</div>
+                    <div class="value" style="font-size:1.1rem">{{ booking()!.agent_agency_name }}</div>
+                    <div class="text-muted">
+                        Agent: {{ booking()!.agent_contact_name }} • Commission: <strong style="color:#4f46e5">₹{{ booking()!.agent_commission | number:'1.0-0' }}</strong>
+                    </div>
+                </div>
+            }
         </div>
 
         <!-- Travellers -->
@@ -242,6 +269,72 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                                                                           p.status === 'failed' ? 'rejected' : 'draft')">
                                             {{ p.status }}
                                         </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- Vendor Costing Ledger -->
+        <div class="card">
+            <h2>
+                💼 Vendor Costing Ledger
+                <button class="btn btn-sm btn-outline" style="margin-left:auto" (click)="openLedgerModal()">
+                    + Add Cost Item
+                </button>
+            </h2>
+
+            @if (ledgerLoading()) {
+                <span class="spinner"></span>
+            } @else if (vendorLedgers().length === 0) {
+                <p class="text-muted">No vendor costing entries recorded yet.</p>
+            } @else {
+                <div class="table-wrap" style="box-shadow:none">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Supplier / Vendor</th>
+                                <th>Type</th>
+                                <th class="num">Cost Price</th>
+                                <th class="num">Paid Amount</th>
+                                <th class="num">Pending Balance</th>
+                                <th>Status</th>
+                                <th>Notes</th>
+                                <th style="text-align:center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (l of vendorLedgers(); track l.id) {
+                                <tr>
+                                    <td><strong>{{ l.supplier_name }}</strong></td>
+                                    <td>
+                                        <span class="traveller-type-badge type-adult" style="text-transform: capitalize;">
+                                            {{ l.supplier_type }}
+                                        </span>
+                                    </td>
+                                    <td class="num">₹{{ l.cost_amount | number:'1.0-0' }}</td>
+                                    <td class="num">₹{{ l.paid_amount | number:'1.0-0' }}</td>
+                                    <td class="num">
+                                        @if (l.cost_amount - l.paid_amount > 0) {
+                                            <strong class="text-danger">₹{{ (l.cost_amount - l.paid_amount) | number:'1.0-0' }}</strong>
+                                        } @else {
+                                            <strong class="text-success">₹0</strong>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge" [class]="'badge-' + (l.status === 'paid' ? 'accepted' : l.status === 'partial' ? 'sent' : 'rejected')">
+                                            {{ l.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ l.notes || '—' }}</td>
+                                    <td style="text-align:center">
+                                        <div class="flex" style="justify-content:center;gap:6px">
+                                            <button class="btn btn-sm btn-outline" (click)="openLedgerModal(l)">✏️</button>
+                                            <button class="btn btn-sm btn-danger-outline" (click)="deleteLedger(l.id)" style="width:26px;height:26px;padding:0">×</button>
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -419,6 +512,98 @@ import { FollowupTimelineComponent } from '../../shared/components/followup-time
                 </div>
             </div>
         }
+
+        <!-- Vendor Ledger Modal -->
+        @if (ledgerOpen()) {
+            <div class="modal-backdrop" (click)="closeLedgerModal()">
+                <div class="modal" (click)="$event.stopPropagation()">
+                    <h2 style="margin-top:0">{{ editingLedgerId() ? '✏️ Edit Cost Entry' : '+ Add Cost Entry' }}</h2>
+                    <p class="text-muted">
+                        Record vendor cost & payouts for booking <strong>{{ booking()!.booking_number }}</strong>.
+                    </p>
+                    <div class="form-grid-2">
+                        @if (!editingLedgerId()) {
+                            <div class="form-group" style="grid-column: span 2">
+                                <label>Supplier / Vendor <span class="req">*</span></label>
+                                <select [(ngModel)]="ledgerForm.supplier_id">
+                                    <option value="">— select supplier —</option>
+                                    @for (s of suppliers(); track s.id) {
+                                        <option [value]="s.id">{{ s.name }} ({{ s.type }})</option>
+                                    }
+                                </select>
+                            </div>
+                        } @else {
+                            <div class="form-group" style="grid-column: span 2">
+                                <label>Supplier / Vendor</label>
+                                <input type="text" [value]="getSelectedSupplierName()" disabled style="background:#e2e8f0; border: 1px solid var(--gray-200); padding: 8px 10px; border-radius: 6px; width: 100%; color: var(--gray-600);" />
+                            </div>
+                        }
+                        <div class="form-group">
+                            <label>Cost Price (₹) <span class="req">*</span></label>
+                            <input type="number" [(ngModel)]="ledgerForm.cost_amount" min="0" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Paid to Vendor (₹)</label>
+                            <input type="number" [(ngModel)]="ledgerForm.paid_amount" min="0" step="1">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:10px">
+                        <label>Notes</label>
+                        <textarea rows="2" [(ngModel)]="ledgerForm.notes"
+                                  placeholder="e.g. Flight ticket booking cost or advance paid to hotelier" style="width: 100%; box-sizing: border-box;"></textarea>
+                    </div>
+                    @if (ledgerError()) {
+                        <div class="info-badge" style="background:#fee2e2;color:#991b1b;display:block;margin-bottom:10px">
+                            ✕ {{ ledgerError() }}
+                        </div>
+                    }
+                    <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:12px">
+                        <button class="btn ghost" (click)="closeLedgerModal()" [disabled]="ledgerSubmitting()">Cancel</button>
+                        <button class="btn btn-success" (click)="submitLedger()" [disabled]="ledgerSubmitting()">
+                            @if (ledgerSubmitting()) { <span class="spinner"></span> Saving… }
+                            @else { ✓ Save Entry }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- WhatsApp Notification Modal -->
+        @if (whatsappOpen()) {
+            <div class="modal-backdrop" (click)="closeWhatsappModal()">
+                <div class="modal" (click)="$event.stopPropagation()">
+                    <h2 style="margin-top:0">💬 Send WhatsApp Notification</h2>
+                    <p class="text-muted">
+                        Send message to traveller <strong>{{ booking()!.customer_name }}</strong> at <strong>{{ booking()!.customer_phone }}</strong>.
+                    </p>
+                    <div class="form-group">
+                        <label>Select Template</label>
+                        <select [(ngModel)]="selectedTemplate" (change)="applyTemplate()">
+                            <option value="custom">Custom Message (No Template)</option>
+                            <option value="confirmation">Booking Confirmation</option>
+                            <option value="receipt">Payment Receipt</option>
+                            <option value="reminder">Balance Reminder</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-top:10px">
+                        <label>Message Content <span class="req">*</span></label>
+                        <textarea rows="5" [(ngModel)]="whatsappMessage" placeholder="Type message..." style="width: 100%; box-sizing: border-box; font-family: inherit; font-size: 13px; border: 1px solid var(--gray-300); border-radius: 6px; padding: 8px;"></textarea>
+                    </div>
+                    @if (whatsappError()) {
+                        <div class="info-badge" style="background:#fee2e2;color:#991b1b;display:block;margin-bottom:10px">
+                            ✕ {{ whatsappError() }}
+                        </div>
+                    }
+                    <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:12px">
+                        <button class="btn ghost" (click)="closeWhatsappModal()" [disabled]="whatsappSending()">Cancel</button>
+                        <button class="btn btn-primary" (click)="sendWhatsapp()" [disabled]="whatsappSending() || !whatsappMessage.trim()">
+                            @if (whatsappSending()) { <span class="spinner"></span> Dispatching… }
+                            @else { ✓ Send Message }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
     }
     `,
     styles: [`
@@ -455,9 +640,16 @@ export class BookingDetailComponent implements OnInit {
     private route = inject(ActivatedRoute);
     private router = inject(Router);
     private toast = inject(ToastService);
+    private supplierService = inject(SupplierService);
+    private pdfService = inject(PdfService);
+    private whatsappService = inject(WhatsappService);
 
     loading = signal(true);
     booking = signal<any | null>(null);
+
+    // Agency Settings for PDFs
+    settings = signal<any>(null);
+    generatingVoucher = signal(false);
 
     // Payment modal
     paymentOpen = signal(false);
@@ -470,6 +662,28 @@ export class BookingDetailComponent implements OnInit {
         offline_reference: '',
         offline_note: ''
     };
+
+    // Vendor Costing Ledger
+    vendorLedgers = signal<any[]>([]);
+    suppliers = signal<any[]>([]);
+    ledgerLoading = signal(false);
+    ledgerOpen = signal(false);
+    ledgerSubmitting = signal(false);
+    ledgerError = signal<string | null>(null);
+    editingLedgerId = signal<number | null>(null);
+    ledgerForm = {
+        supplier_id: '',
+        cost_amount: 0,
+        paid_amount: 0,
+        notes: ''
+    };
+
+    // WhatsApp modal
+    whatsappOpen = signal(false);
+    whatsappSending = signal(false);
+    whatsappError = signal<string | null>(null);
+    whatsappMessage = '';
+    selectedTemplate = 'custom';
 
     // Booking travellers
     travellers = signal<BookingTraveller[]>([]);
@@ -499,8 +713,211 @@ export class BookingDetailComponent implements OnInit {
         const id = this.route.snapshot.paramMap.get('id');
         if (!id) { this.loading.set(false); return; }
         this.api.getBooking(id).subscribe({
-            next: b => { this.booking.set(b); this.loading.set(false); this.loadTasks(); this.loadTravellers(); },
+            next: b => {
+                this.booking.set(b);
+                this.loading.set(false);
+                this.loadTasks();
+                this.loadTravellers();
+                this.loadLedgers();
+                this.loadSuppliers();
+                this.loadSettings();
+            },
             error: ()  => this.loading.set(false)
+        });
+    }
+
+    loadSettings() {
+        this.api.getSettings().subscribe({
+            next: s => this.settings.set(s),
+            error: () => this.settings.set(null)
+        });
+    }
+
+    loadLedgers() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id) return;
+        this.ledgerLoading.set(true);
+        this.api.listVendorLedgers(id).subscribe({
+            next: r => { this.vendorLedgers.set(r); this.ledgerLoading.set(false); },
+            error: () => this.ledgerLoading.set(false)
+        });
+    }
+
+    loadSuppliers() {
+        this.supplierService.list().subscribe({
+            next: r => this.suppliers.set(r),
+            error: () => {}
+        });
+    }
+
+    openLedgerModal(entry?: any) {
+        if (entry) {
+            this.editingLedgerId.set(entry.id);
+            this.ledgerForm = {
+                supplier_id: String(entry.supplier_id),
+                cost_amount: Number(entry.cost_amount),
+                paid_amount: Number(entry.paid_amount || 0),
+                notes: entry.notes || ''
+            };
+        } else {
+            this.editingLedgerId.set(null);
+            this.ledgerForm = {
+                supplier_id: '',
+                cost_amount: 0,
+                paid_amount: 0,
+                notes: ''
+            };
+        }
+        this.ledgerError.set(null);
+        this.ledgerOpen.set(true);
+    }
+
+    closeLedgerModal() {
+        this.ledgerOpen.set(false);
+    }
+
+    getSelectedSupplierName(): string {
+        const s = this.suppliers().find(x => String(x.id) === this.ledgerForm.supplier_id);
+        return s ? `${s.name} (${s.type})` : 'Supplier';
+    }
+
+    submitLedger() {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id) return;
+
+        if (!this.ledgerForm.supplier_id) {
+            this.ledgerError.set('Please select a supplier');
+            return;
+        }
+        if (this.ledgerForm.cost_amount == null || this.ledgerForm.cost_amount < 0) {
+            this.ledgerError.set('Cost price must be 0 or greater');
+            return;
+        }
+
+        this.ledgerSubmitting.set(true);
+        this.ledgerError.set(null);
+
+        const body = {
+            supplier_id: Number(this.ledgerForm.supplier_id),
+            cost_amount: this.ledgerForm.cost_amount,
+            paid_amount: this.ledgerForm.paid_amount,
+            notes: this.ledgerForm.notes || null
+        };
+
+        const obs = this.editingLedgerId()
+            ? this.api.updateVendorLedger(id, this.editingLedgerId()!, body)
+            : this.api.createVendorLedger(id, body);
+
+        obs.subscribe({
+            next: () => {
+                this.ledgerSubmitting.set(false);
+                this.ledgerOpen.set(false);
+                this.toast.success(this.editingLedgerId() ? 'Cost item updated' : 'Cost item added');
+                this.reload();
+            },
+            error: err => {
+                this.ledgerSubmitting.set(false);
+                this.ledgerError.set(err?.error?.error || 'Failed to save cost entry');
+            }
+        });
+    }
+
+    deleteLedger(ledgerId: number) {
+        const id = this.route.snapshot.paramMap.get('id');
+        if (!id || !confirm('Are you sure you want to delete this cost entry?')) return;
+
+        this.api.deleteVendorLedger(id, ledgerId).subscribe({
+            next: () => {
+                this.toast.success('Cost entry deleted');
+                this.reload();
+            },
+            error: () => this.toast.error('Failed to delete cost entry')
+        });
+    }
+
+    downloadVoucher() {
+        const b = this.booking();
+        if (!b) return;
+        const bookingData = {
+            ...b,
+            hotels: b.hotels || [],
+            cars: b.cars || [],
+            travellers: this.travellers()
+        };
+        this.generatingVoucher.set(true);
+        setTimeout(() => {
+            try {
+                const s = this.settings() ?? {};
+                this.pdfService.generateVoucherPdf(bookingData, s);
+                this.toast.success('Tour Voucher downloaded');
+            } catch (e) {
+                this.toast.error('Voucher generation failed: ' + (e as Error).message);
+            } finally {
+                this.generatingVoucher.set(false);
+            }
+        }, 50);
+    }
+
+    openWhatsappModal() {
+        this.selectedTemplate = 'confirmation';
+        this.whatsappError.set(null);
+        this.applyTemplate();
+        this.whatsappOpen.set(true);
+    }
+
+    closeWhatsappModal() {
+        this.whatsappOpen.set(false);
+    }
+
+    applyTemplate() {
+        const b = this.booking();
+        if (!b) return;
+
+        const bal = this.balance();
+        const start = this.formatDateString(b.trip_start_date);
+
+        if (this.selectedTemplate === 'confirmation') {
+            this.whatsappMessage = `Hello ${b.customer_name}, your booking #${b.booking_number} for ${b.destination_name || b.destination_text || 'your trip'} starting on ${start} is confirmed! Thank you for choosing us.`;
+        } else if (this.selectedTemplate === 'receipt') {
+            const paid = Number(b.amount_paid || 0);
+            this.whatsappMessage = `Hello ${b.customer_name}, we have successfully recorded your payment of ₹${paid.toLocaleString('en-IN')}. Your booking reference is #${b.booking_number}.`;
+        } else if (this.selectedTemplate === 'reminder') {
+            this.whatsappMessage = `Hello ${b.customer_name}, this is a friendly reminder that a balance payment of ₹${bal.toLocaleString('en-IN')} is due for your upcoming booking #${b.booking_number} starting on ${start}. Please process the payment soon.`;
+        } else {
+            this.whatsappMessage = '';
+        }
+    }
+
+    formatDateString(dStr: string): string {
+        if (!dStr) return '';
+        const d = new Date(dStr);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    sendWhatsapp() {
+        const b = this.booking();
+        if (!b || !this.whatsappMessage.trim()) return;
+
+        this.whatsappSending.set(true);
+        this.whatsappError.set(null);
+
+        this.whatsappService.sendMessage({
+            to: b.customer_phone,
+            message: this.whatsappMessage.trim()
+        }).subscribe({
+            next: (res: any) => {
+                this.whatsappSending.set(false);
+                this.whatsappOpen.set(false);
+                if (res.mock) {
+                    this.toast.success('WhatsApp sent (Simulated log)');
+                } else {
+                    this.toast.success('WhatsApp sent successfully!');
+                }
+            },
+            error: err => {
+                this.whatsappSending.set(false);
+                this.whatsappError.set(err?.error?.error || 'Failed to dispatch message');
+            }
         });
     }
 

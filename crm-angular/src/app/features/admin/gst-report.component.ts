@@ -87,6 +87,9 @@ import { ToastService } from '../../core/services/toast.service';
     `,
     styles: [`
         .toolbar { display:flex; gap:12px; align-items:flex-end; margin-bottom:0; }
+        @media (max-width: 600px) {
+            .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+        }
     `]
 })
 export class GstReportComponent implements OnInit {

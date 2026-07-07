@@ -63,6 +63,9 @@ import { RoleRecord } from '../../core/models';
     `,
     styles: [`
         .page-head { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px; }
+        @media (max-width: 600px) {
+            .page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
         .page-head h1 { margin:0 0 4px; }
         .muted { color:#6b7280; margin:0; }
         .actions { display:flex; gap:8px; }

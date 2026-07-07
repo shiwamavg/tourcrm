@@ -49,6 +49,13 @@
         </div>
     </div>
 
+    <div class="card" id="referralsCard">
+        <h2>📣 Your Referral Earnings</h2>
+        <div id="referralsArea">
+            <p class="muted"><span class="spinner"></span> Loading your referral earnings…</p>
+        </div>
+    </div>
+
     <div class="card">
         <h2>⭐ Recent reviews from other travellers</h2>
         <div id="reviewsArea">
@@ -131,6 +138,53 @@
         } catch (err) {
             if (err.status === 401) { Auth.clear(); location.href = 'portal.html'; return; }
             showAlert('error', 'Failed to load bookings: ' + err.message);
+        }
+    })();
+
+    // Load Referrals
+    (async () => {
+        try {
+            const res = await API.myReferrals(Auth.token);
+            const items = res.items || [];
+            const area = document.getElementById('referralsArea');
+            if (items.length > 0) {
+                area.innerHTML = `
+                    <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Referred Trip</th><th>Friend Name</th><th>Booking Ref</th><th class="num">Commission</th><th>Status</th><th>Paid Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(c => `
+                                <tr>
+                                    <td><strong>${escapeHtml(c.package_title || 'Custom Tour')}</strong></td>
+                                    <td>${escapeHtml(c.referred_customer_name)}</td>
+                                    <td><code>${escapeHtml(c.referred_booking_number)}</code></td>
+                                    <td class="num"><strong>${formatINRShort(c.amount)}</strong></td>
+                                    <td>
+                                        <span class="badge badge-${c.status}">${c.status}</span>
+                                    </td>
+                                    <td>${c.paid_at ? formatDate(c.paid_at) : '—'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    </div>
+                `;
+            } else {
+                area.innerHTML = `
+                    <div class="empty" style="text-align: center; padding: 24px 0;">
+                        <div style="font-size: 2.5rem; margin-bottom: 8px;">📣</div>
+                        <p style="font-weight: 600; margin-bottom: 4px;">No referral commissions earned yet.</p>
+                        <p class="muted" style="font-size: 13px;">To get started, click **View** on any of your active bookings above to copy your referral link and share it with friends!</p>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            console.error('Failed to load referrals:', err);
+            document.getElementById('referralsArea').innerHTML = `<p class="muted">Referral earnings could not be loaded.</p>`;
         }
     })();
 

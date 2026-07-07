@@ -42,6 +42,7 @@ const API = {
     // ── Bookings ───────────────────────────────────────────
     myBookings(token)            { return this._fetch('/portal/bookings',     { token }); },
     bookingDetail(id, token)     { return this._fetch(`/portal/bookings/${id}`, { token }); },
+    myReferrals(token)           { return this._fetch('/portal/referrals',      { token }); },
 
     // ── Payments ───────────────────────────────────────────
     payBooking(id, amount, token) {
@@ -80,6 +81,30 @@ const API = {
         if (!resp.ok) throw new Error(`Failed to download invoice (HTTP ${resp.status})`);
         const blob = await resp.blob();
         return URL.createObjectURL(blob);
+    },
+
+    // ── B2B Agent Portal ──────────────────────────────────
+    agentSignup(body) {
+        return this._fetch('/agent/auth/signup', { method: 'POST', body });
+    },
+    agentLogin(email, password, companyId = 1) {
+        return this._fetch('/agent/auth/login', { method: 'POST', body: { email, password, company_id: companyId } });
+    },
+    agentDashboard(token) {
+        const t = token || localStorage.getItem('agent_token');
+        return this._fetch('/agent/dashboard', { token: t });
+    },
+    agentSubmitTrip(body, token) {
+        const t = token || localStorage.getItem('agent_token');
+        return this._fetch('/agent/trips', { method: 'POST', body, token: t });
+    },
+    agentTrips(token) {
+        const t = token || localStorage.getItem('agent_token');
+        return this._fetch('/agent/trips', { token: t });
+    },
+    agentCommissions(token) {
+        const t = token || localStorage.getItem('agent_token');
+        return this._fetch('/agent/commissions', { token: t });
     }
 };
 

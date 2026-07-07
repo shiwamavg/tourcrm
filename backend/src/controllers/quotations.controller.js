@@ -15,14 +15,19 @@ const generateQuotationNumber = async (conn, companyId) => {
 
 // ── Recalculate totals from line items ────────────────────────────
 const recalcTotals = async (conn, quotationId, companyId) => {
+    // Fetch the quotation's exchange rate first
+    const [q] = await conn.query('SELECT agent_id, markup_pct, gst_pct, exchange_rate FROM quotations WHERE id = ? AND company_id = ?', [quotationId, companyId]);
+    const quotationEx = Number(q[0]?.exchange_rate || 1);
+
     const [hotels] = await conn.query(
-        'SELECT COALESCE(SUM(line_total),0) AS t FROM quotation_hotels WHERE quotation_id = ? AND company_id = ?',
-        [quotationId, companyId]
+        'SELECT COALESCE(SUM((line_total * exchange_rate) / ?), 0) AS t FROM quotation_hotels WHERE quotation_id = ? AND company_id = ?',
+        [quotationEx, quotationId, companyId]
     );
     const [cars] = await conn.query(
-        'SELECT COALESCE(SUM(line_total),0) AS t FROM quotation_cars WHERE quotation_id = ? AND company_id = ?',
-        [quotationId, companyId]
+        'SELECT COALESCE(SUM((line_total * exchange_rate) / ?), 0) AS t FROM quotation_cars WHERE quotation_id = ? AND company_id = ?',
+        [quotationEx, quotationId, companyId]
     );
+    // Flights and Misc don't have currency_code, assume they are entered in the billing currency directly
     const [flights] = await conn.query(
         'SELECT COALESCE(SUM(line_total),0) AS t FROM quotation_flights WHERE quotation_id = ? AND company_id = ?',
         [quotationId, companyId]
@@ -38,7 +43,7 @@ const recalcTotals = async (conn, quotationId, companyId) => {
     const miscTotal   = Number(misc[0].t);
     const subtotal    = hotelTotal + carTotal + flightTotal + miscTotal;
 
-    const [q] = await conn.query('SELECT markup_pct, gst_pct FROM quotations WHERE id = ? AND company_id = ?', [quotationId, companyId]);
+    const agentId      = q[0]?.agent_id || null;
     const markupPct    = Number(q[0]?.markup_pct || 0);
     const gstPct       = Number(q[0]?.gst_pct || 0);
     const markupAmount = subtotal * markupPct / 100;
@@ -46,13 +51,29 @@ const recalcTotals = async (conn, quotationId, companyId) => {
     const gstAmount    = gstBase * gstPct / 100;
     const grandTotal   = gstBase + gstAmount;
 
+    let agentCommission = 0.00;
+    if (agentId) {
+        const [agentRows] = await conn.query(
+            'SELECT commission_type, commission_rate FROM agents WHERE id = ? AND company_id = ?',
+            [agentId, companyId]
+        );
+        if (agentRows.length > 0) {
+            const agent = agentRows[0];
+            if (agent.commission_type === 'percentage') {
+                agentCommission = subtotal * (Number(agent.commission_rate) / 100);
+            } else if (agent.commission_type === 'fixed') {
+                agentCommission = Number(agent.commission_rate);
+            }
+        }
+    }
+
     await conn.query(
         `UPDATE quotations SET
             hotel_total=?, car_total=?, flight_total=?, misc_total=?,
-            subtotal=?, markup_amount=?, gst_amount=?, grand_total=?
+            subtotal=?, markup_amount=?, gst_amount=?, grand_total=?, agent_commission=?
          WHERE id=? AND company_id=?`,
         [hotelTotal, carTotal, flightTotal, miscTotal,
-         subtotal, markupAmount, gstAmount, grandTotal, quotationId, companyId]
+         subtotal, markupAmount, gstAmount, grandTotal, agentCommission, quotationId, companyId]
     );
 };
 
@@ -64,11 +85,12 @@ const insertHotels = async (conn, qId, companyId, hotels = []) => {
             `INSERT INTO quotation_hotels
                 (quotation_id, company_id, hotel_rate_id, hotel_name, star_rating, room_type,
                  meal_plan, charge_per_night, num_nights, num_rooms, special_charges,
-                 special_charges_note, sort_order)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 special_charges_note, currency_code, exchange_rate, original_rate, sort_order)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [qId, companyId, h.hotel_rate_id || null, h.hotel_name, h.star_rating || null,
              h.room_type, h.meal_plan || 'none', h.charge_per_night, h.num_nights,
-             h.num_rooms || 1, h.special_charges || 0, h.special_charges_note || null, i]
+             h.num_rooms || 1, h.special_charges || 0, h.special_charges_note || null,
+             h.currency_code || 'INR', h.exchange_rate || 1.000000, h.original_rate || null, i]
         );
     }
 };
@@ -79,11 +101,11 @@ const insertCars = async (conn, qId, companyId, cars = []) => {
         await conn.query(
             `INSERT INTO quotation_cars
                 (quotation_id, company_id, car_rate_id, car_type_name, car_class, charge_per_day,
-                 num_days, km_limit_per_day, extra_charge_per_km, estimated_extra_km, sort_order)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+                 num_days, km_limit_per_day, extra_charge_per_km, estimated_extra_km, currency_code, exchange_rate, original_rate, sort_order)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [qId, companyId, c.car_rate_id || null, c.car_type_name, c.car_class || 'standard',
-             c.charge_per_day, c.num_days, c.km_limit_per_day || 250,
-             c.extra_charge_per_km || 0, c.estimated_extra_km || 0, i]
+             c.charge_per_day, c.num_days, c.km_limit_per_day || 250, c.extra_charge_per_km || 0,
+             c.estimated_extra_km || 0, c.currency_code || 'INR', c.exchange_rate || 1.000000, c.original_rate || null, i]
         );
     }
 };
@@ -140,7 +162,8 @@ const createQuotation = async (req, res, next) => {
             trip_start_date, trip_end_date, adults = 1,
             children_below_5 = 0, children_above_5 = 0, num_rooms = 1, package_type,
             markup_pct = 10, gst_pct = 5, valid_till, terms_notes, internal_notes,
-            hotels = [], cars = [], flights = [], misc = [], daywise_itinerary = []
+            hotels = [], cars = [], flights = [], misc = [], daywise_itinerary = [],
+            agent_id, billing_currency, exchange_rate
         } = req.body || {};
 
         if (!customer_name || !customer_phone) {
@@ -163,13 +186,15 @@ const createQuotation = async (req, res, next) => {
                 (quotation_number, lead_id, customer_name, customer_email, customer_phone, created_by,
                  destination_id, destination_text, package_id, trip_start_date, trip_end_date,
                  adults, children_below_5, children_above_5, num_rooms, package_type,
-                 markup_pct, gst_pct, valid_till, terms_notes, internal_notes, status, company_id)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 markup_pct, gst_pct, valid_till, terms_notes, internal_notes, status, company_id, agent_id,
+                 billing_currency, exchange_rate)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [quotationNumber, lead_id || null, customer_name, customer_email || null, customer_phone,
              req.user.id, destination_id || null, destination_text || null, package_id || null,
              trip_start_date, trip_end_date, adults, children_below_5, children_above_5, num_rooms,
              package_type, markup_pct, gst_pct, valid_till || null,
-             terms_notes || null, internal_notes || null, 'draft', req.companyId]
+             terms_notes || null, internal_notes || null, 'draft', req.companyId, agent_id || null,
+             billing_currency || 'INR', exchange_rate || 1.000000]
         );
         const qId = qResult.insertId;
 
@@ -218,7 +243,8 @@ const updateQuotation = async (req, res, next) => {
             trip_start_date, trip_end_date, adults = 1,
             children_below_5 = 0, children_above_5 = 0, num_rooms = 1, package_type,
             markup_pct = 10, gst_pct = 5, valid_till, terms_notes, internal_notes,
-            hotels = [], cars = [], flights = [], misc = [], daywise_itinerary = []
+            hotels = [], cars = [], flights = [], misc = [], daywise_itinerary = [],
+            agent_id, billing_currency, exchange_rate
         } = req.body || {};
 
         // Verify ownership
@@ -237,14 +263,15 @@ const updateQuotation = async (req, res, next) => {
                 destination_id=?, destination_text=?, package_id=?,
                 trip_start_date=?, trip_end_date=?,
                 adults=?, children_below_5=?, children_above_5=?, num_rooms=?, package_type=?,
-                markup_pct=?, gst_pct=?, valid_till=?, terms_notes=?, internal_notes=?
+                markup_pct=?, gst_pct=?, valid_till=?, terms_notes=?, internal_notes=?, agent_id=?,
+                billing_currency=?, exchange_rate=?
               WHERE id=? AND company_id=?`,
             [customer_name, customer_email || null, customer_phone,
              destination_id || null, destination_text || null, package_id || null,
              trip_start_date, trip_end_date,
              adults, children_below_5, children_above_5, num_rooms, package_type,
              markup_pct, gst_pct, valid_till || null, terms_notes || null, internal_notes || null,
-             id, req.companyId]
+             agent_id || null, billing_currency || 'INR', exchange_rate || 1.000000, id, req.companyId]
         );
 
         // Delete old line items and re-insert

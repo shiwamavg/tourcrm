@@ -16,5 +16,11 @@ router.patch('/:id/status',           ctl.updateStatus);
 router.get('/:id/payments',           payCtl.listByBooking);
 router.get('/:id/invoices',           invCtl.listByBooking);
 
+// Vendor Costing Ledger
+router.get('/:id/vendor-ledgers',             ctl.listVendorLedgers);
+router.post('/:id/vendor-ledgers',            ctl.createVendorLedger);
+router.patch('/:id/vendor-ledgers/:ledgerId',  ctl.updateVendorLedger);
+router.delete('/:id/vendor-ledgers/:ledgerId', ctl.deleteVendorLedger);
+
 module.exports = router;
 

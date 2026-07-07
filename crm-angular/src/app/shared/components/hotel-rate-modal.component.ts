@@ -94,6 +94,9 @@ import { DestinationModalComponent } from './destination-modal.component';
         .close-btn { background:none; border:none; font-size:22px; color:#9ca3af; cursor:pointer; }
         form { padding:18px 22px; }
         .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+        @media (max-width: 600px) {
+            .form-grid-2 { grid-template-columns: 1fr; }
+        }
         .form-group { display:flex; flex-direction:column; gap:4px; }
         .form-group label { font-size:13px; color:#374151; }
         .req { color:#dc2626; }

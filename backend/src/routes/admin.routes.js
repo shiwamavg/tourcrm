@@ -30,4 +30,12 @@ router.delete('/car-rates/:id',     requireRole('admin', 'manager'), c.deleteCar
 router.get('/settings',             c.getSettings);
 router.patch('/settings',           requireRole('admin', 'manager'), c.updateSettings);
 
+// B2B Agent Management
+router.get('/agents',               requireRole('admin', 'manager', 'accounts'), c.listAgents);
+router.patch('/agents/:id/status',  requireRole('admin', 'manager'), c.updateAgentStatus);
+
+// Commission Management
+router.get('/commissions',          requireRole('admin', 'manager', 'accounts'), c.listCommissions);
+router.post('/commissions/:id/pay', requireRole('admin', 'accounts'), c.payCommission);
+
 module.exports = router;

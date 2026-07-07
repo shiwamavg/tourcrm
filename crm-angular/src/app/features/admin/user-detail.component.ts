@@ -107,6 +107,9 @@ import { StaffUser, RoleRecord } from '../../core/models';
     `,
     styles: [`
         .page-head { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px; }
+        @media (max-width: 600px) {
+            .page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
         .page-head h1 { margin:6px 0 4px; }
         .back-link { color:#0f766e; text-decoration:none; font-size:13px; }
         .muted { color:#6b7280; margin:0; }
@@ -115,6 +118,9 @@ import { StaffUser, RoleRecord } from '../../core/models';
             padding:20px 22px; max-width:720px; margin-bottom:16px;
         }
         .grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px 16px; }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+        }
         label { display:flex; flex-direction:column; gap:4px; font-size:13px; }
         label > span { color:#374151; }
         .req { color:#dc2626; }

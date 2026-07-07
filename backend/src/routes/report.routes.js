@@ -11,5 +11,8 @@ router.get('/sales-by-destination', ctrl.getSalesByDestination);
 router.get('/lead-sources', ctrl.getLeadSources);
 router.get('/monthly-revenue', ctrl.getMonthlyRevenue);
 router.get('/package-performance', ctrl.getPackagePerformance);
+router.get('/payments-by-gateway', ctrl.getPaymentsByGateway);
+router.get('/lead-conversion-rate', ctrl.getLeadConversionRate);
+router.get('/outstanding-payments', ctrl.getOutstandingPayments);
 
 module.exports = router;

@@ -59,6 +59,11 @@ app.use('/api/super-admin', require('./routes/super-admin.routes'));
 // Monitoring / metrics for super-admins
 app.use('/api/monitor', require('./routes/monitor.routes'));
 
+// Public landing page endpoints (no auth, no company context)
+const landingPageCtl = require('./controllers/landing-page.controller');
+app.get('/api/pages/:slug', landingPageCtl.renderPublic);
+app.post('/api/pages/:slug/lead', express.json(), landingPageCtl.submitLeadForm);
+
 // Company context extraction and status check for all CRM routes
 app.use(extractCompany);
 app.use(checkCompanyStatus);
@@ -72,6 +77,7 @@ app.use('/api/packages', require('./routes/packages.routes'));
 
 // CRM Routes
 app.use('/api/auth',       require('./routes/auth.routes'));
+app.use('/api/agent',      require('./routes/agent.routes'));
 app.use('/api/billing',    require('./routes/tenant-billing.routes'));
 app.use('/api/quotations', require('./routes/quotations.routes'));
 app.use('/api/admin',      require('./routes/admin.routes'));

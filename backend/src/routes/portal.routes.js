@@ -17,5 +17,6 @@ router.post('/bookings/:id/pay',           c.payBooking);
 router.post('/bookings/:id/pay-offline',   c.payOffline);
 router.post('/bookings/:id/review',        c.reviewBooking);
 router.get ('/invoices/:id/download',      inv.downloadPortalInvoice);
+router.get ('/referrals',                  c.myReferrals);
 
 module.exports = router;

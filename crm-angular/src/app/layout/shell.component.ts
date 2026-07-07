@@ -141,7 +141,7 @@ import { ApiService } from '../core/services/api.service';
                             <span class="nav-icon">🌍</span> <span class="nav-label">Destinations</span>
                         </a>
                         <a routerLink="/admin/packages" routerLinkActive="active">
-                            <span class="nav-icon">🧳</span> <span class="nav-label">Predefined Packages</span>
+                            <span class="nav-icon">🧳</span> <span class="nav-label">Tour Packages</span>
                         </a>
                         <a routerLink="/admin/hotel-rates" routerLinkActive="active">
                             <span class="nav-icon">🏨</span> <span class="nav-label">Hotel Rates</span>
@@ -176,6 +176,12 @@ import { ApiService } from '../core/services/api.service';
                         <a routerLink="/admin/gst-report" routerLinkActive="active">
                             <span class="nav-icon">📊</span> <span class="nav-label">GST Report</span>
                         </a>
+                        <a routerLink="/admin/agents" routerLinkActive="active">
+                            <span class="nav-icon">🤝</span> <span class="nav-label">B2B Agents</span>
+                        </a>
+                        <a routerLink="/admin/commissions" routerLinkActive="active">
+                            <span class="nav-icon">💰</span> <span class="nav-label">Agent Commissions</span>
+                        </a>
                     }
                 }
             </nav>
@@ -199,7 +205,6 @@ import { ApiService } from '../core/services/api.service';
                     <button class="menu-toggle" (click)="sidebarOpen.set(true)" aria-label="Open menu">
                         <span></span><span></span><span></span>
                     </button>
-                    <div class="page-title">{{ pageTitle() }}</div>
                 </div>
                 <div class="topbar-actions">
                     <button class="theme-toggle" (click)="toggleTheme()"
@@ -390,7 +395,7 @@ export class ShellComponent implements OnInit {
         '/invoices': 'Invoices',
         '/reviews': 'Reviews',
         '/admin/destinations': 'Destinations',
-        '/admin/packages': 'Predefined Packages',
+        '/admin/packages': 'Tour Packages',
         '/admin/hotel-rates': 'Hotel Rates',
         '/admin/car-rates': 'Car Rates',
         '/admin/users': 'Users & Roles',
@@ -403,6 +408,8 @@ export class ShellComponent implements OnInit {
         '/admin/payment-reminders': 'Payment Reminders',
         '/admin/followup-sequences': 'Follow-up Sequences',
         '/admin/gst-report': 'GST Report',
+        '/admin/agents': 'B2B Agents',
+        '/admin/commissions': 'Agent Commissions',
         '/suppliers': 'Suppliers',
         '/tasks': 'Tasks',
         '/itineraries': 'Itineraries',

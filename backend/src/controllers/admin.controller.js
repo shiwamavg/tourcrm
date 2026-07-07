@@ -254,10 +254,144 @@ const updateSettings = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ── B2B AGENT MANAGEMENT ──────────────────────────────────────────
+const listAgents = async (req, res, next) => {
+    try {
+        const { status, page = 1, limit = 20 } = req.query || {};
+        const params = [req.companyId];
+        let query = 'SELECT id, agency_name, agent_name, email, phone, commission_type, commission_rate, status, created_at, updated_at FROM agents WHERE company_id = ?';
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+        query += ' ORDER BY id DESC LIMIT ? OFFSET ?';
+        const lim = Math.max(1, Math.min(100, Number(limit)));
+        const offset = (Math.max(1, Number(page)) - 1) * lim;
+        params.push(lim, offset);
+
+        const [rows] = await db.query(query, params);
+
+        // Get count
+        let countQuery = 'SELECT COUNT(*) as total FROM agents WHERE company_id = ?';
+        const countParams = [req.companyId];
+        if (status) {
+            countQuery += ' AND status = ?';
+            countParams.push(status);
+        }
+        const [[{ total }]] = await db.query(countQuery, countParams);
+
+        res.json({ items: rows, total, page: Number(page), limit: lim });
+    } catch (err) { next(err); }
+};
+
+const updateAgentStatus = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { status, commission_type, commission_rate } = req.body || {};
+        const allowed = ['status', 'commission_type', 'commission_rate'];
+        const fields = [];
+        const params = [];
+        
+        if (status !== undefined) {
+            fields.push('status = ?');
+            params.push(status);
+        }
+        if (commission_type !== undefined) {
+            fields.push('commission_type = ?');
+            params.push(commission_type);
+        }
+        if (commission_rate !== undefined) {
+            fields.push('commission_rate = ?');
+            params.push(Number(commission_rate));
+        }
+
+        if (!fields.length) return res.status(400).json({ error: 'No fields to update' });
+        params.push(id, req.companyId);
+
+        const [r] = await db.query(`UPDATE agents SET ${fields.join(', ')} WHERE id = ? AND company_id = ?`, params);
+        if (!r.affectedRows) return res.status(404).json({ error: 'Agent not found' });
+
+        const [rows] = await db.query('SELECT id, agency_name, agent_name, email, phone, commission_type, commission_rate, status, created_at, updated_at FROM agents WHERE id = ?', [id]);
+        res.json(rows[0]);
+    } catch (err) { next(err); }
+};
+
+// ── COMMISSION MANAGEMENT ─────────────────────────────────────────
+const listCommissions = async (req, res, next) => {
+    try {
+        const { status, agent_id, page = 1, limit = 20 } = req.query || {};
+        const params = [req.companyId];
+        let query = `
+            SELECT c.*, b.booking_number, b.total_amount, b.customer_name as client_name,
+                   a.agency_name, a.agent_name,
+                   rb.booking_number AS referrer_booking_number
+            FROM commissions c
+            JOIN bookings b ON b.id = c.booking_id
+            LEFT JOIN agents a ON a.id = c.agent_id
+            LEFT JOIN bookings rb ON rb.id = c.referrer_booking_id
+            WHERE c.company_id = ?
+        `;
+        if (status) {
+            query += ' AND c.status = ?';
+            params.push(status);
+        }
+        if (agent_id) {
+            query += ' AND c.agent_id = ?';
+            params.push(agent_id);
+        }
+        query += ' ORDER BY c.id DESC LIMIT ? OFFSET ?';
+        const lim = Math.max(1, Math.min(100, Number(limit)));
+        const offset = (Math.max(1, Number(page)) - 1) * lim;
+        params.push(lim, offset);
+
+        const [rows] = await db.query(query, params);
+
+        // Get count
+        let countQuery = 'SELECT COUNT(*) as total FROM commissions c WHERE c.company_id = ?';
+        const countParams = [req.companyId];
+        if (status) {
+            countQuery += ' AND c.status = ?';
+            countParams.push(status);
+        }
+        if (agent_id) {
+            countQuery += ' AND c.agent_id = ?';
+            countParams.push(agent_id);
+        }
+        const [[{ total }]] = await db.query(countQuery, countParams);
+
+        res.json({ items: rows, total, page: Number(page), limit: lim });
+    } catch (err) { next(err); }
+};
+
+const payCommission = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { payment_reference, notes } = req.body || {};
+        if (!payment_reference) {
+            return res.status(400).json({ error: 'payment_reference is required' });
+        }
+
+        const [r] = await db.query(
+            `UPDATE commissions
+             SET status = 'paid', payment_reference = ?, paid_at = NOW(), notes = COALESCE(?, notes)
+             WHERE id = ? AND company_id = ?`,
+            [payment_reference, notes || null, id, req.companyId]
+        );
+
+        if (!r.affectedRows) {
+            return res.status(404).json({ error: 'Commission record not found or not belonging to your company' });
+        }
+
+        const [rows] = await db.query('SELECT * FROM commissions WHERE id = ?', [id]);
+        res.json(rows[0]);
+    } catch (err) { next(err); }
+};
+
 module.exports = {
     listDestinations, createDestination, updateDestination,
     listHotelRates, createHotelRate, updateHotelRate, deleteHotelRate,
     listCarTypes,
     listCarRates, createCarRate, updateCarRate, deleteCarRate,
-    getSettings, updateSettings
+    getSettings, updateSettings,
+    listAgents, updateAgentStatus, listCommissions, payCommission
 };

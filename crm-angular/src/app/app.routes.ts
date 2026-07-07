@@ -203,6 +203,14 @@ export const routes: Routes = [
             {
                 path: 'admin/gst-report',
                 loadComponent: () => import('./features/admin/gst-report.component').then(m => m.GstReportComponent)
+            },
+            {
+                path: 'admin/agents',
+                loadComponent: () => import('./features/admin/agent-list.component').then(m => m.AgentListComponent)
+            },
+            {
+                path: 'admin/commissions',
+                loadComponent: () => import('./features/admin/commission-list.component').then(m => m.CommissionListComponent)
             }
         ]
     },

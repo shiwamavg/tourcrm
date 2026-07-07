@@ -9,9 +9,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f766e">
   <script>!function(){var t=localStorage.getItem("crm_theme");t||(t=window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t)}()</script>
 </head>
 <body>
   <app-root></app-root>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('ServiceWorker registration successful with scope: ', reg.scope))
+          .catch((err) => console.error('ServiceWorker registration failed: ', err));
+      });
+    }
+  </script>
 </body>
 </html>

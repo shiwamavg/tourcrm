@@ -11,8 +11,11 @@ const COL_DARK:    [number, number, number] = [17, 24, 39];    // #111827
 const COL_LIGHT:   [number, number, number] = [243, 244, 246]; // #f3f4f6
 const COL_BORDER:  [number, number, number] = [229, 231, 235]; // #e5e7eb
 
-const inr = (n: number) =>
-    'INR ' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+const formatCurrency = (n: number, currencyCode: string = 'INR') => {
+    const currencyMap: any = { 'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£', 'AED': 'د.إ' };
+    const symbol = currencyMap[currencyCode] || currencyCode + ' ';
+    return symbol + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+};
 
 const fmtDate = (s?: string) => {
     if (!s) return '—';
@@ -23,6 +26,9 @@ const fmtDate = (s?: string) => {
 @Injectable({ providedIn: 'root' })
 export class PdfService {
     generateQuotationPdf(q: Quotation, s: AgencySettings | null | undefined): void {
+        const currencyCode = (q as any).billing_currency || 'INR';
+        const inr = (n: number) => formatCurrency(n, currencyCode);
+
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const pageW = doc.internal.pageSize.getWidth();
         const pageH = doc.internal.pageSize.getHeight();
@@ -381,5 +387,350 @@ export class PdfService {
         if (isNaN(d.getTime())) return dateStr;
         const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+    }
+
+    generateVoucherPdf(b: any, s: any): void {
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 40;
+
+        // ── Header / Footer delegates (jspdf hooks) ───────────
+        this.applyHeaderFooter(doc, s, b.booking_number, pageW, pageH, margin);
+
+        // ── Title block ────────────────────────────────────────
+        let y = 100;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(22);
+        doc.setTextColor(...COL_DARK);
+        doc.text('CONFIRMED TOUR VOUCHER', margin, y);
+        y += 10;
+        doc.setDrawColor(...COL_PRIMARY);
+        doc.setLineWidth(2);
+        doc.line(margin, y, margin + 250, y);
+        y += 24;
+
+        // ── Booking meta (right column) ──────────────────────
+        const metaX = pageW - margin;
+        doc.setFontSize(9);
+        doc.setTextColor(...COL_GRAY);
+        doc.setFont('helvetica', 'normal');
+        const metaLines: [string, string][] = [
+            ['Booking #', b.booking_number],
+            ['Date Confirmed', fmtDate(b.created_at)],
+            ['Trip Starts', fmtDate(b.trip_start_date)],
+            ['Trip Ends', fmtDate(b.trip_end_date)]
+        ];
+        let my = 100;
+        for (const [label, value] of metaLines) {
+            doc.text(label, metaX - 110, my, { align: 'left' });
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...COL_DARK);
+            doc.text(value, metaX, my, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...COL_GRAY);
+            my += 16;
+        }
+
+        // ── Customer + Trip panels (2 columns) ─────────────────
+        y = Math.max(y, my + 12);
+        const colW = (pageW - margin * 2 - 16) / 2;
+
+        // Customer details
+        this.panel(doc, margin, y, colW, 92, 'CUSTOMER DETAILS', [
+            b.customer_name || '—',
+            b.customer_phone || '—',
+            b.customer_email || '—'
+        ]);
+
+        // Trip Details
+        this.panel(doc, margin + colW + 16, y, colW, 92, 'TRIP DETAILS', [
+            `Destination: ${b.destination_name || b.destination_text || '—'}`,
+            `Dates: ${fmtDate(b.trip_start_date)} → ${fmtDate(b.trip_end_date)}`,
+            `Pax: ${b.adults} adults` + 
+                (b.children_below_5 ? `, ${b.children_below_5} child <5` : '') + 
+                (b.children_above_5 ? `, ${b.children_above_5} child >5` : ''),
+            `Rooms: ${b.num_rooms || 1}  •  Package: ${b.package_title || 'Custom Tour'}`
+        ]);
+
+        y += 92 + 18;
+
+        // ── Travellers List ────────────────────────────────────
+        if (b.travellers?.length) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(...COL_DARK);
+            doc.text('PASSENGER DETAILS', margin, y); y += 6;
+            autoTable(doc, {
+                startY: y,
+                head: [['#', 'Full Name', 'Type', 'Aadhar Number']],
+                body: b.travellers.map((t: any, idx: number) => [
+                    idx + 1,
+                    t.full_name,
+                    t.traveller_type === 'adult' ? 'Adult' : t.traveller_type === 'child_below_5' ? 'Child < 5y' : 'Child > 5y',
+                    t.aadhar_number || '—'
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: COL_PRIMARY },
+                margin: { left: margin, right: margin }
+            });
+            y = (doc as any).lastAutoTable.finalY + 18;
+        }
+
+        // ── Hotels table ───────────────────────────────────────
+        if (b.hotels?.length) {
+            if (y > pageH - 120) { doc.addPage(); y = 100; }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(...COL_DARK);
+            doc.text('HOTEL RESERVATIONS', margin, y); y += 6;
+            autoTable(doc, {
+                startY: y,
+                head: [['Hotel', 'Room Type', 'Meal Plan', 'Nights', 'Rooms']],
+                body: b.hotels.map((h: any) => [
+                    h.hotel_name,
+                    h.room_type,
+                    this.meal(h.meal_plan),
+                    h.num_nights,
+                    h.num_rooms
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: COL_PRIMARY },
+                margin: { left: margin, right: margin }
+            });
+            y = (doc as any).lastAutoTable.finalY + 18;
+        }
+
+        // ── Transport table ────────────────────────────────────
+        if (b.cars?.length) {
+            if (y > pageH - 120) { doc.addPage(); y = 100; }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(...COL_DARK);
+            doc.text('TRANSPORT DETAILS', margin, y); y += 6;
+            autoTable(doc, {
+                startY: y,
+                head: [['Vehicle Type', 'Class', 'Duration (Days)', 'Emergency Support']],
+                body: b.cars.map((c: any) => [
+                    c.car_type_name,
+                    c.car_class,
+                    c.num_days,
+                    s?.phone || 'Agency Helpline'
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: COL_PRIMARY },
+                margin: { left: margin, right: margin }
+            });
+            y = (doc as any).lastAutoTable.finalY + 18;
+        }
+
+        // ── Emergency & Checklist ──────────────────────────────
+        if (y > pageH - 140) { doc.addPage(); y = 100; }
+        this.sectionTitle(doc, 'IMPORTANT INFORMATION & EMERGENCY CONTACTS', margin, y); y += 14;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...COL_DARK);
+        
+        const infoLines = [
+            `• Please carry a valid Photo ID (Aadhar Card, Passport, or Voter ID) for all travelers.`,
+            `• Emergency Helpline: ${s?.phone || 'Contact agency'} (${s?.email || 'email support'})`,
+            `• Check-in time at hotels is usually 12:00 PM and check-out is 10:00 AM. Early check-in is subject to availability.`,
+            `• Please present this voucher at hotel check-in desks and to the cab driver upon arrival.`
+        ];
+        
+        for (const line of infoLines) {
+            doc.text(line, margin, y);
+            y += 14;
+        }
+
+        // ── Save ───────────────────────────────────────────────
+        const safeNum = b.booking_number.replace(/[^a-z0-9_-]/gi, '_');
+        doc.save(`Voucher_${safeNum}.pdf`);
+    }
+
+    generateInvoicePdf(i: any, s: AgencySettings | null | undefined): void {
+        const currencyCode = i.billing_currency || 'INR';
+        const inr = (n: number) => formatCurrency(n, currencyCode);
+
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 40;
+
+        this.applyHeaderFooter(doc, s, i.invoice_number, pageW, pageH, margin);
+
+        let y = 100;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(22);
+        doc.setTextColor(...COL_DARK);
+        doc.text('TAX INVOICE', margin, y);
+        y += 10;
+        doc.setDrawColor(...COL_PRIMARY);
+        doc.setLineWidth(2);
+        doc.line(margin, y, margin + 140, y);
+        y += 24;
+
+        const metaX = pageW - margin;
+        doc.setFontSize(9);
+        doc.setTextColor(...COL_GRAY);
+        doc.setFont('helvetica', 'normal');
+        const metaLines: [string, string][] = [
+            ['Invoice #', i.invoice_number],
+            ['Date', fmtDate(i.issued_at)],
+            ['Status', (i.status || '').toUpperCase()],
+            ['Due Date', fmtDate(i.due_date)]
+        ];
+        let my = 100;
+        for (const [label, value] of metaLines) {
+            doc.text(label, metaX - 90, my, { align: 'left' });
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...COL_DARK);
+            doc.text(value, metaX, my, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...COL_GRAY);
+            my += 16;
+        }
+
+        y = Math.max(y, my + 12);
+        const colW = (pageW - margin * 2 - 16) / 2;
+
+        this.panel(doc, margin, y, colW, 92, 'BILL TO', [
+            i.customer_name || '—',
+            i.customer_phone || '—',
+            i.customer_email || '—'
+        ]);
+
+        this.panel(doc, margin + colW + 16, y, colW, 92, 'REFERENCE', [
+            `Booking #: ${i.booking_number || '—'}`,
+            `Destination: ${i.destination_text || '—'}`,
+            `Travel Dates: ${fmtDate(i.trip_start_date)} → ${fmtDate(i.trip_end_date)}`
+        ]);
+
+        y += 92 + 24;
+
+        autoTable(doc, {
+            startY: y,
+            head: [['Description', 'Amount']],
+            body: [
+                ['Tour Package Charges', inr(i.subtotal)],
+                [`Markup (${i.markup_pct}%)`, inr(i.markup_amount)],
+                [`GST (${i.gst_pct}%)`, inr(i.gst_amount)]
+            ].filter(row => Number(String(row[1]).replace(/[^0-9.-]+/g, '')) > 0),
+            margin: { left: margin, right: margin },
+            headStyles: { fillColor: COL_PRIMARY, textColor: 255, fontStyle: 'bold' },
+            columnStyles: { 1: { halign: 'right' } }
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 14;
+
+        const boxW = 230;
+        const boxX = pageW - margin - boxW;
+        const boxH = 90;
+        
+        doc.setFillColor(...COL_LIGHT);
+        doc.setDrawColor(...COL_BORDER);
+        doc.roundedRect(boxX, y, boxW, boxH, 4, 4, 'FD');
+
+        let ty = y + 20;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...COL_DARK);
+        doc.text('TOTAL AMOUNT', boxX + 12, ty);
+        doc.text(inr(i.total), boxX + boxW - 12, ty, { align: 'right' });
+        
+        ty += 24;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COL_GRAY);
+        doc.text('Amount Paid', boxX + 12, ty);
+        doc.setTextColor(5, 150, 105); // green
+        doc.text(inr(i.amount_paid), boxX + boxW - 12, ty, { align: 'right' });
+
+        ty += 20;
+        doc.setDrawColor(...COL_BORDER);
+        doc.setLineWidth(1);
+        doc.line(boxX + 10, ty - 12, boxX + boxW - 10, ty - 12);
+        
+        const balance = Math.max(0, i.total - (i.amount_paid || 0));
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(220, 38, 38); // red
+        doc.text('BALANCE DUE', boxX + 12, ty);
+        doc.text(inr(balance), boxX + boxW - 12, ty, { align: 'right' });
+
+        if (i.notes) {
+            y = Math.max((doc as any).lastAutoTable.finalY + boxH + 20, ty + 40);
+            this.sectionTitle(doc, 'NOTES / PAYMENT TERMS', margin, y);
+            y += 14;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(...COL_GRAY);
+            const lines = doc.splitTextToSize(i.notes, pageW - margin * 2);
+            doc.text(lines, margin, y);
+        }
+
+        const safeNum = i.invoice_number.replace(/[^a-z0-9_-]/gi, '_');
+        doc.save(`Invoice_${safeNum}.pdf`);
+    }
+
+    generateReceiptPdf(p: any, s: AgencySettings | null | undefined): void {
+        const currencyCode = p.currency || 'INR'; // Fallback if currency not provided in payment
+        const inr = (n: number) => formatCurrency(n, currencyCode);
+
+        const doc = new jsPDF({ unit: 'pt', format: 'a5' }); // A5 format for receipts
+        const pageW = doc.internal.pageSize.getWidth();
+        const margin = 30;
+
+        doc.setFillColor(...COL_PRIMARY);
+        doc.rect(0, 0, pageW, 50, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(255, 255, 255);
+        doc.text(s?.agency_name || 'Travel Agency', margin, 32);
+
+        let y = 80;
+        doc.setFontSize(18);
+        doc.setTextColor(...COL_DARK);
+        doc.text('PAYMENT RECEIPT', margin, y);
+        y += 30;
+
+        const details: [string, string][] = [
+            ['Receipt No.', `REC-${p.id}`],
+            ['Date', fmtDate(p.created_at)],
+            ['Payment Method', (p.method_label || p.gateway || '').toUpperCase()],
+            ['Transaction Ref.', p.offline_reference || p.gateway_order_id || '—'],
+            ['Status', (p.status || '').toUpperCase()]
+        ];
+
+        doc.setFontSize(10);
+        for (const [lbl, val] of details) {
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...COL_GRAY);
+            doc.text(lbl, margin, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...COL_DARK);
+            doc.text(val, margin + 120, y);
+            y += 18;
+        }
+
+        y += 20;
+        doc.setFillColor(...COL_LIGHT);
+        doc.roundedRect(margin, y, pageW - margin * 2, 60, 4, 4, 'F');
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(...COL_GRAY);
+        doc.text('Amount Received', margin + 16, y + 26);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        doc.setTextColor(5, 150, 105);
+        doc.text(inr(p.amount), pageW - margin - 16, y + 42, { align: 'right' });
+
+        y += 90;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COL_GRAY);
+        doc.text(`Thank you for your payment. This is an auto-generated receipt.`, pageW / 2, y, { align: 'center' });
+
+        doc.save(`Receipt_REC-${p.id}.pdf`);
     }
 }

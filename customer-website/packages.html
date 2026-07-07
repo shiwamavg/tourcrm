@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Predefined Tour Packages — TourCRM</title>
+    <title>Tour Packages — TourCRM</title>
     <meta name="description" content="Explore our premium travel packages. Book directly online or send an enquiry to our tour managers.">
     <link rel="stylesheet" href="css/marketing.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -370,6 +370,7 @@
                 <div style="display:flex; gap: 8px; flex-wrap:wrap; margin-bottom:12px;">
                     <span class="package-duration-tag" id="modalDuration" style="position:static; display:inline-block; margin-bottom:0;"></span>
                     <span class="package-duration-tag" id="modalCategory" style="position:static; display:inline-block; margin-bottom:0; background: var(--accent); color: #fff;"></span>
+                    <span class="package-duration-tag" id="modalSeats" style="position:static; display:none; margin-bottom:0; color: #fff;"></span>
                 </div>
                 <h2 id="modalTitle" style="margin-bottom:12px;"></h2>
                 <div id="modalPrice" style="font-size:20px; font-weight:800; color:var(--primary); margin-bottom:16px;"></div>
@@ -562,12 +563,24 @@
                 <div class="packages-grid">
                     ${loadedPackages.map((p, idx) => {
                         const img = p.image_url || getFallbackImage(idx);
+                        const seatsBadge = p.max_participants !== null 
+                            ? `<span class="package-seats-tag" style="position: absolute; top: 12px; right: 12px; background: ${p.remaining_seats === 0 ? 'rgba(220, 38, 38, 0.95)' : (p.price_surge_threshold !== null && p.remaining_seats <= p.price_surge_threshold ? 'rgba(245, 158, 11, 0.95)' : 'rgba(16, 185, 129, 0.95)')}; backdrop-filter: blur(4px); color: #fff; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); z-index: 2;">
+                                💺 ${p.remaining_seats === 0 ? 'Sold Out' : `${p.remaining_seats} / ${p.max_participants} Seats`}
+                               </span>`
+                            : '';
+                        const priceBadge = p.current_price !== p.price 
+                            ? `<span class="package-price-tag" style="background: rgba(185, 28, 28, 0.95);">
+                                <span style="text-decoration: line-through; opacity: 0.6; font-size: 11px; margin-right: 4px; font-weight: normal;">${formatCurrency(p.price)}</span>
+                                ${formatCurrency(p.current_price)}*
+                               </span>`
+                            : `<span class="package-price-tag">Starts at ${formatCurrency(p.price)}</span>`;
                         return `
                             <div class="package-card">
                                 <div class="package-img-wrap">
                                     <img src="${escapeHtml(img)}" class="package-img" alt="${escapeHtml(p.title)}" onerror="this.src='${imageFallbacks[0]}'">
                                     <span class="package-duration-tag">📅 ${p.duration_days} Days / ${p.duration_nights} Nights</span>
-                                    <span class="package-price-tag">Starts at ${formatCurrency(p.price)}</span>
+                                    ${seatsBadge}
+                                    ${priceBadge}
                                 </div>
                                 <div class="package-body">
                                     <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">
@@ -585,6 +598,16 @@
                     }).join('')}
                 </div>
             `;
+
+            // Auto-open modal if package_id parameter is present
+            const urlParams = new URLSearchParams(window.location.search);
+            const pkgIdParam = urlParams.get('package_id');
+            if (pkgIdParam) {
+                const pid = parseInt(pkgIdParam, 10);
+                if (pid && loadedPackages.some(p => p.id === pid)) {
+                    openDetails(pid);
+                }
+            }
         } catch (err) {
             catalogArea.innerHTML = `
                 <div class="alert alert-error text-center" style="max-width:560px; margin:40px auto;">
@@ -603,7 +626,42 @@
         document.getElementById('modalTitle').textContent = selectedPkg.title;
         document.getElementById('modalDuration').textContent = `📅 ${selectedPkg.duration_days} Days / ${selectedPkg.duration_nights} Nights`;
         document.getElementById('modalCategory').textContent = selectedPkg.category || 'Individual / Family';
-        document.getElementById('modalPrice').textContent = `Starting at ${formatCurrency(selectedPkg.price)}`;
+        
+        // Price & surge info
+        const priceDiv = document.getElementById('modalPrice');
+        if (selectedPkg.current_price !== selectedPkg.price) {
+            priceDiv.innerHTML = `
+                <span style="text-decoration: line-through; color: var(--gray-400); font-size: 16px; font-weight: normal; margin-right: 8px;">
+                    ${formatCurrency(selectedPkg.price)}
+                </span>
+                <span style="color: var(--danger); font-size: 22px;">${formatCurrency(selectedPkg.current_price)}</span>
+                <div style="font-size: 12px; color: var(--danger); font-weight: 600; margin-top: 4px;">
+                    🔥 Price surged due to high demand (limited seats remaining!)
+                </div>
+            `;
+        } else {
+            priceDiv.textContent = `Starting at ${formatCurrency(selectedPkg.price)}`;
+        }
+
+        // Seats Remaining badge
+        const seatsSpan = document.getElementById('modalSeats');
+        if (selectedPkg.max_participants !== null) {
+            seatsSpan.style.display = 'inline-block';
+            const rem = selectedPkg.remaining_seats;
+            const max = selectedPkg.max_participants;
+            seatsSpan.textContent = `💺 ${rem} / ${max} Seats Remaining`;
+            if (rem === 0) {
+                seatsSpan.style.backgroundColor = 'var(--danger)';
+                seatsSpan.textContent = `💺 Sold Out`;
+            } else if (selectedPkg.price_surge_threshold !== null && rem <= selectedPkg.price_surge_threshold) {
+                seatsSpan.style.backgroundColor = '#f59e0b'; // amber/orange
+            } else {
+                seatsSpan.style.backgroundColor = 'var(--success)';
+            }
+        } else {
+            seatsSpan.style.display = 'none';
+        }
+
         document.getElementById('modalDesc').textContent = selectedPkg.description || '';
 
         // Hotels
@@ -674,6 +732,25 @@
         bookingFormContainer.style.display = 'block';
         bookingSuccessContainer.style.display = 'none';
 
+        // Limit/Validate travellers
+        const travellersInput = document.getElementById('book_travellers');
+        if (selectedPkg.max_participants !== null) {
+            travellersInput.max = selectedPkg.remaining_seats;
+            travellersInput.placeholder = `Max ${selectedPkg.remaining_seats} seat(s)`;
+            if (selectedPkg.remaining_seats === 0) {
+                bookSubmitBtn.disabled = true;
+                bookSubmitBtn.textContent = 'Sold Out';
+            } else {
+                bookSubmitBtn.disabled = false;
+                bookSubmitBtn.textContent = 'Send Booking Request';
+            }
+        } else {
+            travellersInput.removeAttribute('max');
+            travellersInput.placeholder = 'e.g. 2';
+            bookSubmitBtn.disabled = false;
+            bookSubmitBtn.textContent = 'Send Booking Request';
+        }
+
         // Open
         pkgModal.classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -698,13 +775,16 @@
 
         modalAlertSlot.innerHTML = '';
         
+        const urlParams = new URLSearchParams(window.location.search);
         const payload = {
             full_name: document.getElementById('book_full_name').value.trim(),
             phone: document.getElementById('book_phone').value.trim(),
             email: document.getElementById('book_email').value.trim(),
             travel_date: document.getElementById('book_travel_date').value || undefined,
             travellers: document.getElementById('book_travellers').value ? parseInt(document.getElementById('book_travellers').value) : undefined,
-            notes: document.getElementById('book_notes').value.trim() || undefined
+            notes: document.getElementById('book_notes').value.trim() || undefined,
+            ref_agent: urlParams.get('ref_agent') || undefined,
+            ref_booking: urlParams.get('ref_booking') || undefined
         };
 
         // Validate

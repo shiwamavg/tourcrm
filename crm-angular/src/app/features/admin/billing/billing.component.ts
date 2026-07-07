@@ -21,7 +21,7 @@ import { ToastService } from '../../../core/services/toast.service';
     @if (loading()) {
         <div class="card text-center" style="padding: 48px;"><span class="spinner"></span> Loading Billing Details…</div>
     } @else {
-        <div class="billing-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div class="billing-grid">
             
             <!-- Left Side: Subscription Overview & Upgrades -->
             <div class="billing-left" style="display: flex; flex-direction: column; gap: 24px;">
@@ -66,14 +66,14 @@ import { ToastService } from '../../../core/services/toast.service';
                     <h2 style="margin-top: 0;">Change Subscription Plan</h2>
                     <p class="text-muted" style="margin-bottom: 20px; font-size: 14px;">Select from our standard plans below to change or renew your subscription.</p>
                     
-                    <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                    <div class="cycle-buttons">
                         <button class="btn" [class.btn-primary]="billingCycle() === 'monthly'" (click)="billingCycle.set('monthly')">Monthly Billing</button>
                         <button class="btn" [class.btn-primary]="billingCycle() === 'yearly'" (click)="billingCycle.set('yearly')">Annual Billing (Save 20%)</button>
                     </div>
 
                     <div class="packages-list" style="display: flex; flex-direction: column; gap: 12px;">
                         @for (pkg of availablePackages(); track pkg.id) {
-                            <div class="package-option-row" [class.selected]="selectedPackageId() === pkg.id" (click)="selectedPackageId.set(pkg.id)" style="border: 2px solid #e5e7eb; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center;" [style.border-color]="selectedPackageId() === pkg.id ? '#0f766e' : '#e5e7eb'" [style.background]="selectedPackageId() === pkg.id ? '#f0fdfa' : '#fff'">
+                            <div class="package-option-row" [class.selected]="selectedPackageId() === pkg.id" (click)="selectedPackageId.set(pkg.id)" [style.border-color]="selectedPackageId() === pkg.id ? '#0f766e' : '#e5e7eb'" [style.background]="selectedPackageId() === pkg.id ? '#f0fdfa' : '#fff'">
                                 <div>
                                     <strong style="font-size: 15px; color: #111827;">{{ pkg.name }}</strong>
                                     <p class="text-muted" style="margin: 4px 0 0; font-size: 12px;">{{ pkg.description }}</p>
@@ -196,7 +196,22 @@ import { ToastService } from '../../../core/services/toast.service';
 
         </div>
     }
-    `
+    `,
+    styles: [`
+        .billing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .cycle-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+        .package-option-row {
+            border: 2px solid #e5e7eb; border-radius: 8px; padding: 16px; cursor: pointer;
+            transition: all 0.2s; display: flex; justify-content: space-between; align-items: center;
+        }
+        @media (max-width: 900px) {
+            .billing-grid { grid-template-columns: 1fr; gap: 16px; }
+        }
+        @media (max-width: 480px) {
+            .package-option-row { flex-direction: column; align-items: stretch; gap: 12px; text-align: left; }
+            .package-option-row div:last-child { text-align: left !important; }
+        }
+    `]
 })
 export class BillingComponent implements OnInit {
     private api = inject(ApiService);

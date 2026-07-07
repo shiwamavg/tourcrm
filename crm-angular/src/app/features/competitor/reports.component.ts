@@ -99,7 +99,49 @@ import { ToastService } from '../../core/services/toast.service';
             </div>
         </div>
 
-        <!-- 5. Predefined Packages Performance -->
+        <!-- 5. Gateway Distribution -->
+        <div class="report-card">
+            <div class="card-header">
+                <h2>Payments by Gateway</h2>
+                <button class="export-btn" (click)="exportGatewayCSV()">CSV</button>
+            </div>
+            <div class="chart-container">
+                @for (g of gatewayPerf(); track g.gateway) {
+                    <div class="chart-bar-row">
+                        <div class="bar-label capitalize">{{ g.gateway }}</div>
+                        <div class="bar-wrapper">
+                            <div class="bar green" [style.width.%]="getGatewayPercent(g.total_amount)"></div>
+                        </div>
+                        <div class="bar-value">₹{{ g.total_amount | number }} ({{ g.transaction_count }} txns)</div>
+                    </div>
+                } @empty {
+                    <div class="empty">No payment data.</div>
+                }
+            </div>
+        </div>
+
+        <!-- 6. Lead Conversion Rate -->
+        <div class="report-card">
+            <div class="card-header">
+                <h2>Lead Conversion Rate (MoM)</h2>
+                <button class="export-btn" (click)="exportConversionCSV()">CSV</button>
+            </div>
+            <div class="chart-container">
+                @for (c of conversionRates(); track c.month) {
+                    <div class="chart-bar-row">
+                        <div class="bar-label">{{ c.month }}</div>
+                        <div class="bar-wrapper">
+                            <div class="bar amber" [style.width.%]="c.conversion_rate"></div>
+                        </div>
+                        <div class="bar-value">{{ c.conversion_rate }}% ({{ c.converted_leads }}/{{ c.total_leads }})</div>
+                    </div>
+                } @empty {
+                    <div class="empty">No conversion data.</div>
+                }
+            </div>
+        </div>
+
+        <!-- 7. Predefined Packages Performance -->
         <div class="report-card col-span-full">
             <div class="card-header">
                 <h2>Predefined Packages Performance</h2>
@@ -138,6 +180,40 @@ import { ToastService } from '../../core/services/toast.service';
                 </table>
             </div>
         </div>
+
+        <!-- 8. Outstanding Payments -->
+        <div class="report-card col-span-full" style="border-left: 4px solid #ef4444;">
+            <div class="card-header">
+                <h2>Accounts Receivable / Outstanding Payments</h2>
+                <button class="export-btn" (click)="exportOutstandingCSV()">CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Booking #</th>
+                            <th>Customer Name</th>
+                            <th>Total Amount</th>
+                            <th>Amount Paid</th>
+                            <th>Outstanding Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (o of outstandingPayments(); track o.id) {
+                            <tr>
+                                <td><strong>{{ o.booking_number }}</strong></td>
+                                <td>{{ o.customer_name }}</td>
+                                <td>₹{{ o.total_amount | number }}</td>
+                                <td>₹{{ o.amount_paid | number }}</td>
+                                <td style="color: #ef4444; font-weight: bold;">₹{{ o.outstanding | number }}</td>
+                            </tr>
+                        } @empty {
+                            <tr><td colspan="5" class="empty" style="color: #10b981;">No outstanding payments! All accounts settled.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     `,
     styles: [`
@@ -163,11 +239,13 @@ import { ToastService } from '../../core/services/toast.service';
         .bar.blue { background: linear-gradient(90deg, #2563eb, #60a5fa); }
         .bar.amber { background: linear-gradient(90deg, #d97706, #fbbf24); }
         .bar.purple { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+        .bar.green { background: linear-gradient(90deg, #10b981, #34d399); }
         
         .bar-value { min-width: 140px; text-align: right; font-weight: 600; color: #1f2937; }
         .capitalize { text-transform: capitalize; }
         .empty { text-align: center; color: #9ca3af; padding: 40px 0; }
         .col-span-full { grid-column: 1 / -1; }
+        .table-wrap { overflow-x: auto; }
         .report-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         .report-table th, .report-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
         .report-table th { background: #f9fafb; font-weight: 600; color: #4b5563; }
@@ -183,6 +261,11 @@ export class ReportsComponent implements OnInit {
     leadSources = signal<any[]>([]);
     monthlyRev = signal<any[]>([]);
     packagePerf = signal<any[]>([]);
+    
+    // New endpoints
+    gatewayPerf = signal<any[]>([]);
+    conversionRates = signal<any[]>([]);
+    outstandingPayments = signal<any[]>([]);
 
     ngOnInit() {
         this.loadReports();
@@ -213,6 +296,21 @@ export class ReportsComponent implements OnInit {
             next: (data) => this.packagePerf.set(data || []),
             error: () => this.toast.error('Failed to load package performance data.')
         });
+
+        this.reports.getPaymentsByGateway().subscribe({
+            next: (data) => this.gatewayPerf.set(data || []),
+            error: () => this.toast.error('Failed to load gateway payments data.')
+        });
+
+        this.reports.getLeadConversionRate().subscribe({
+            next: (data) => this.conversionRates.set(data || []),
+            error: () => this.toast.error('Failed to load conversion rates data.')
+        });
+
+        this.reports.getOutstandingPayments().subscribe({
+            next: (data) => this.outstandingPayments.set(data || []),
+            error: () => this.toast.error('Failed to load outstanding payments data.')
+        });
     }
 
     // Calculations for bar percentages
@@ -236,6 +334,11 @@ export class ReportsComponent implements OnInit {
         return Math.max((revenue / max) * 100, 5);
     }
 
+    getGatewayPercent(amount: number): number {
+        const max = Math.max(...this.gatewayPerf().map(g => g.total_amount), 1);
+        return Math.max((amount / max) * 100, 5);
+    }
+
     // CSV Exports
     exportAgentCSV() {
         this.exportToCSV('Sales_By_Agent', ['Agent Name', 'Bookings Count', 'Total Sales (INR)'], ['agent_name', 'bookings_count', 'total_sales'], this.agentSales());
@@ -251,6 +354,18 @@ export class ReportsComponent implements OnInit {
 
     exportRevenueCSV() {
         this.exportToCSV('Monthly_Revenue', ['Month', 'Revenue (INR)'], ['month', 'revenue'], this.monthlyRev());
+    }
+
+    exportGatewayCSV() {
+        this.exportToCSV('Payments_By_Gateway', ['Gateway', 'Transactions', 'Total Amount (INR)'], ['gateway', 'transaction_count', 'total_amount'], this.gatewayPerf());
+    }
+
+    exportConversionCSV() {
+        this.exportToCSV('Lead_Conversion_Rate', ['Month', 'Total Leads', 'Converted Leads', 'Conversion Rate (%)'], ['month', 'total_leads', 'converted_leads', 'conversion_rate'], this.conversionRates());
+    }
+
+    exportOutstandingCSV() {
+        this.exportToCSV('Outstanding_Payments', ['Booking Number', 'Customer Name', 'Total Amount', 'Amount Paid', 'Outstanding Balance'], ['booking_number', 'customer_name', 'total_amount', 'amount_paid', 'outstanding'], this.outstandingPayments());
     }
 
     exportPackageCSV() {

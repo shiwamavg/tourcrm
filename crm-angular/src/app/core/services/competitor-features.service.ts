@@ -132,9 +132,12 @@ export class EmailCampaignService {
     private base = 'http://localhost:3000/api/email-campaigns';
 
     list(): Observable<any[]> { return this.http.get<any[]>(this.base); }
+    get(id: number): Observable<any> { return this.http.get(`${this.base}/${id}`); }
     create(body: any): Observable<any> { return this.http.post(this.base, body); }
     update(id: number, body: any): Observable<any> { return this.http.patch(`${this.base}/${id}`, body); }
     delete(id: number): Observable<any> { return this.http.delete(`${this.base}/${id}`); }
+    send(id: number, body?: { scheduled_at?: string }): Observable<any> { return this.http.post(`${this.base}/${id}/send`, body || {}); }
+    getStats(id: number): Observable<any> { return this.http.get(`${this.base}/${id}/stats`); }
 }
 
 @Injectable({ providedIn: 'root' })
@@ -178,4 +181,7 @@ export class ReportsService {
     getLeadSources(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/lead-sources`); }
     getMonthlyRevenue(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/monthly-revenue`); }
     getPackagePerformance(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/package-performance`); }
+    getPaymentsByGateway(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/payments-by-gateway`); }
+    getLeadConversionRate(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/lead-conversion-rate`); }
+    getOutstandingPayments(): Observable<any[]> { return this.http.get<any[]>(`${this.base}/outstanding-payments`); }
 }

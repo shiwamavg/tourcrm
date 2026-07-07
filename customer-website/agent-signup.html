@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Registration — TourCRM</title>
+    <link rel="stylesheet" href="css/portal.css">
+    <link rel="stylesheet" href="css/marketing.css">
+    <script>
+        window.API_BASE = 'http://localhost:3000';
+    </script>
+    <style>
+        .portal-nav { background: #fff; border-bottom: 1px solid var(--gray-200); }
+        .portal-nav .container { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+        .portal-nav .brand { color: var(--gray-900); }
+        .portal-nav nav a { color: var(--gray-700); font-size: 14px; margin-left: 18px; }
+        .portal-wrap { max-width: 480px; margin: 40px auto; }
+        .portal-box { background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 28px; box-shadow: var(--shadow-lg); }
+    </style>
+</head>
+<body>
+
+<header class="portal-nav">
+    <div class="container">
+        <a href="index.html" class="brand">
+            <span class="logo">🏔️</span>
+            <span>TourCRM</span>
+        </a>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="agent-login.html">Agent Login</a>
+        </nav>
+    </div>
+</header>
+
+<main class="portal-wrap">
+    <div class="portal-box">
+        <h1>🤝 B2B Partner Registration</h1>
+        <p class="hero">Register your travel agency to book trips with us and earn commissions.</p>
+
+        <div data-alert style="display:none"></div>
+
+        <form id="signupForm">
+            <div class="form-group">
+                <label for="agencyName">Agency / Company Name <span class="req">*</span></label>
+                <input id="agencyName" type="text" required placeholder="e.g. Mountain Travels Ltd">
+            </div>
+            <div class="form-group">
+                <label for="agentName">Primary Contact Person <span class="req">*</span></label>
+                <input id="agentName" type="text" required placeholder="e.g. Ramesh Chettri">
+            </div>
+            <div class="form-group">
+                <label for="email">Business Email <span class="req">*</span></label>
+                <input id="email" type="email" required placeholder="you@agency.com">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone Number <span class="req">*</span></label>
+                <input id="phone" type="tel" required placeholder="e.g. +91 98765 43210">
+            </div>
+            <div class="form-group">
+                <label for="password">Create Password <span class="req">*</span></label>
+                <input id="password" type="password" required placeholder="Minimum 6 characters" minlength="6">
+            </div>
+            <button class="btn btn-primary btn-block" id="signupBtn" type="submit">
+                ✓ Submit Registration
+            </button>
+        </form>
+
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:18px 0">
+        <p class="muted" style="text-align:center">
+            Already registered? <br>
+            <a href="agent-login.html" style="font-weight:600">Sign in to Agent Portal</a>
+        </p>
+    </div>
+</main>
+
+<footer>
+    <div class="wrap">
+        <div class="row">
+            <div>
+                <h4>TourCRM</h4>
+                <p>CRM software for tour & travel agencies</p>
+                <p>✉ support@tourcrm.example.com</p>
+            </div>
+            <div>
+                <h4>Quick links</h4>
+                <p><a href="index.html">Home</a></p>
+                <p><a href="agent-login.html">Agent Login</a></p>
+            </div>
+        </div>
+        <div class="copy">© <span id="year"></span> TourCRM. All rights reserved.</div>
+    </div>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="js/api.js"></script>
+<script src="js/agent.js"></script>
+<script>
+    if (AgentAuth.token) {
+        location.replace('agent-dashboard.html');
+    }
+
+    const form = document.getElementById('signupForm');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const agencyName = document.getElementById('agencyName').value.trim();
+        const agentName = document.getElementById('agentName').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const password = document.getElementById('password').value;
+        const btn = document.getElementById('signupBtn');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Registering…';
+
+        try {
+            const r = await API.agentSignup({
+                agency_name: agencyName,
+                agent_name: agentName,
+                email,
+                phone,
+                password,
+                company_id: 1 // Sikkim Trails Travel default
+            });
+            showAlert('success', r.message || 'Registration submitted! Please wait for admin approval.');
+            form.reset();
+            form.style.display = 'none';
+        } catch (err) {
+            showAlert('error', err.message || 'Failed to submit registration');
+            btn.disabled = false;
+            btn.innerHTML = '✓ Submit Registration';
+        }
+    });
+</script>
+
+</body>
+</html>

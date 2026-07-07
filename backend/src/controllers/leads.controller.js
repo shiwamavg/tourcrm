@@ -309,12 +309,12 @@ const convertLead = async (req, res, next) => {
             const [qIns] = await conn.query(
                 `INSERT INTO quotations
                     (quotation_number, lead_id, customer_name, customer_email, customer_phone,
-                     destination_text, package_id, trip_start_date, trip_end_date, package_type, num_rooms,
+                     destination_text, package_id, referrer_booking_id, trip_start_date, trip_end_date, package_type, num_rooms,
                      adults, children_below_5, children_above_5,
                      hotel_total, car_total, flight_total, misc_total, subtotal,
                      markup_pct, markup_amount, gst_pct, gst_amount, grand_total,
-                     status, version, internal_notes, created_by, company_id)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0,0,0,0,0, 0,0,0,0,0, 'draft', 1, ?, ?, ?)`,
+                     status, version, internal_notes, created_by, company_id, agent_id)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0,0,0,0,0, 0,0,0,0,0, 'draft', 1, ?, ?, ?, ?)`,
                 [quotation_number,
                  lead.id,
                  lead.full_name,
@@ -322,6 +322,7 @@ const convertLead = async (req, res, next) => {
                  lead.phone,
                  lead.destination_text,
                  lead.package_id || null,
+                 lead.referrer_booking_id || null,
                  isoDate(start),
                  isoDate(end),
                  'hotel_car',
@@ -329,7 +330,8 @@ const convertLead = async (req, res, next) => {
                  2, 0, 0,
                  `[Converted from lead #${lead.id} (source=${lead.source})]\n${lead.notes || ''}`.trim(),
                  req.user?.id || null,
-                 req.companyId]
+                 req.companyId,
+                 lead.agent_id || null]
             );
             await conn.query(
                 'UPDATE leads SET status = ?, converted_quotation_id = ? WHERE id = ? AND company_id = ?',

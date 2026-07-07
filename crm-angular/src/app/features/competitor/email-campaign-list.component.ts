@@ -25,28 +25,30 @@ import { ToastService } from '../../core/services/toast.service';
     </div>
     }
     <table>
-        <thead><tr><th>Name</th><th>Subject</th><th>Sent</th><th>Opens</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Subject</th><th>Target/Sent</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
         <tbody>
             @for (c of campaigns(); track c.id) {
                 <tr>
-                    <td>{{ c.name }}</td>
+                    <td><strong>{{ c.name }}</strong></td>
                     <td>{{ c.subject }}</td>
-                    <td>{{ c.sent_count }}</td>
-                    <td>{{ c.open_count }}</td>
+                    <td>{{ c.sent_count }} sent</td>
                     <td><span class="badge" [class]="c.status">{{ c.status }}</span></td>
                     <td>{{ c.created_at | date:'short' }}</td>
                     <td>
-                        <button class="btn small" (click)="edit(c)">Edit</button>
+                        <button class="btn small" (click)="edit(c)" style="margin-right:4px;">Edit</button>
+                        <button class="btn small" style="background:#2563eb; margin-right:4px;" (click)="send(c.id)" [disabled]="c.status !== 'draft'">Send</button>
+                        <button class="btn small ghost" style="margin-right:4px;" (click)="stats(c.id)">Stats</button>
                         <button class="btn small warn" (click)="remove(c.id)">Delete</button>
                     </td>
                 </tr>
-            } @empty { <tr><td colspan="7" class="empty">No campaigns.</td></tr> }
+            } @empty { <tr><td colspan="6" class="empty">No campaigns.</td></tr> }
         </tbody>
     </table>
     `,
     styles: [`
         h1 { margin:0 0 14px; font-size:1.3rem; }
         .btn { padding:8px 12px; border:none; border-radius:6px; background:#0f766e; color:#fff; cursor:pointer; font-size:13px; }
+        .btn:disabled { opacity:0.5; cursor:not-allowed; }
         .btn.ghost { background:#f3f4f6; color:#374151; }
         .btn.small { padding:4px 8px; font-size:12px; }
         .btn.warn { background:#b91c1c; }
@@ -81,15 +83,40 @@ export class EmailCampaignListComponent implements OnInit {
     edit(c: any) {
         this.editingId.set(c.id);
         this.form = { ...c };
+        // Convert dates to string for datetime-local
+        if (this.form.scheduled_at) {
+            this.form.scheduled_at = new Date(this.form.scheduled_at).toISOString().slice(0, 16);
+        }
         this.showForm.set(true);
     }
 
     save() {
         this.saving.set(true);
-        const op = this.editingId() ? this.api.update(this.editingId()!, this.form) : this.api.create(this.form);
+        const payload = { ...this.form };
+        if (!payload.scheduled_at) payload.scheduled_at = null; // Fix empty strings for dates
+        
+        const op = this.editingId() ? this.api.update(this.editingId()!, payload) : this.api.create(payload);
         op.subscribe({
             next: () => { this.saving.set(false); this.showForm.set(false); this.editingId.set(null); this.form = { name: '', subject: '', body_html: '', body_text: '', scheduled_at: '' }; this.load(); this.toast.success('Saved'); },
             error: () => { this.saving.set(false); this.toast.error('Failed'); }
+        });
+    }
+
+    send(id: number) {
+        if (!confirm('Are you sure you want to queue this campaign for sending?')) return;
+        this.api.send(id).subscribe({
+            next: () => { this.toast.success('Campaign queued for sending'); this.load(); },
+            error: (err) => { this.toast.error(err.error?.error || 'Failed to send'); }
+        });
+    }
+
+    stats(id: number) {
+        this.api.getStats(id).subscribe({
+            next: (data) => {
+                const msg = `Total Recipients: ${data.total_recipients}\nSent Count: ${data.sent_count}\nDelivery Rate: ${data.delivery_rate}%`;
+                alert(msg);
+            },
+            error: () => { this.toast.error('Failed to get stats'); }
         });
     }
 
